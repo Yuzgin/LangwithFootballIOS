@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import Combine
 
 class AuthService {
     static let shared = AuthService()
@@ -22,6 +23,51 @@ class AuthService {
     /// Expose the saved access token for API requests
     var authToken: String? {
         UserDefaults.standard.string(forKey: "accessToken")
+    }
+
+    /// Refresh the access token using the saved refresh token
+    private func refreshAccessToken(completion: @escaping (Result<Void, Error>) -> Void) {
+        guard let refresh = UserDefaults.standard.string(forKey: "refreshToken") else {
+            let err = NSError(domain: "", code: -4, userInfo: [NSLocalizedDescriptionKey: "No refresh token available"])
+            completion(.failure(err))
+            return
+        }
+
+        let url = URL(string: "\(baseURL)/api/token/refresh/")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let body: [String: Any] = ["refresh": refresh]
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            if let error = error {
+                completion(.failure(error))
+                return
+            }
+
+            guard let data = data,
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let newAccess = json["access"] as? String else {
+                let err = NSError(domain: "", code: -5, userInfo: [NSLocalizedDescriptionKey: "Invalid refresh response"])
+                completion(.failure(err))
+                return
+            }
+
+            UserDefaults.standard.set(newAccess, forKey: "accessToken")
+            completion(.success(()))
+        }.resume()
+    }
+
+    /// Publisher wrapper for refreshing tokens
+    func refreshTokensPublisher() -> AnyPublisher<Void, Error> {
+        Future { promise in
+            self.refreshAccessToken { result in
+                promise(result)
+            }
+        }
+        .eraseToAnyPublisher()
     }
     
     /// Log in and store tokens
