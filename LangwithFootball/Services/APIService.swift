@@ -11,6 +11,10 @@ import Combine
 class APIService {
     static let shared = APIService()
     private let baseURL = URL(string: "https://www.langwithfootball.com")!
+
+    private enum APIError: Error {
+        case unauthorized
+    }
     
     private init() {}
     
@@ -35,31 +39,60 @@ class APIService {
 
         return request
     }
+
+    /// Perform an authenticated request, attempting token refresh on 401 responses
+    private func performAuthorizedRequest(path: String, method: String = "GET", retry: Bool = true) -> AnyPublisher<Data, Error> {
+        let request = makeAuthRequest(path: path, method: method)
+
+        return URLSession.shared.dataTaskPublisher(for: request)
+            .tryMap { data, response -> Data in
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    throw URLError(.badServerResponse)
+                }
+                if httpResponse.statusCode == 401 {
+                    throw APIError.unauthorized
+                }
+                guard 200..<300 ~= httpResponse.statusCode else {
+                    throw URLError(.badServerResponse)
+                }
+                return data
+            }
+            .mapError { $0 as Error }
+            .catch { [weak self] error -> AnyPublisher<Data, Error> in
+                guard let self = self else {
+                    return Fail(error: error).eraseToAnyPublisher()
+                }
+                if retry, let apiError = error as? APIError, apiError == .unauthorized {
+                    return AuthService.shared.refreshTokensPublisher()
+                        .flatMap { _ in
+                            self.performAuthorizedRequest(path: path, method: method, retry: false)
+                        }
+                        .eraseToAnyPublisher()
+                } else {
+                    return Fail(error: error).eraseToAnyPublisher()
+                }
+            }
+            .eraseToAnyPublisher()
+    }
     
     /// Fetch all players
     func fetchPlayers() -> AnyPublisher<[Player], Error> {
-        let request = makeAuthRequest(path: "/api/players/")
-        return URLSession.shared.dataTaskPublisher(for: request)
-            .map(\.data)
+        return performAuthorizedRequest(path: "/api/players/")
             .decode(type: [Player].self, decoder: JSONDecoder())
             .eraseToAnyPublisher()
     }
     
     /// Fetch the current user's team
     func fetchTeam() -> AnyPublisher<Team, Error> {
-        let request = makeAuthRequest(path: "/api/team/")
-        return URLSession.shared.dataTaskPublisher(for: request)
-            .map(\.data)
+        return performAuthorizedRequest(path: "/api/team/")
             .decode(type: Team.self, decoder: JSONDecoder())
             .eraseToAnyPublisher()
     }
     
     /// Delete the current user's team
     func deleteTeam() -> AnyPublisher<Void, Error> {
-        let request = makeAuthRequest(path: "/api/team/delete/", method: "DELETE")
-        return URLSession.shared.dataTaskPublisher(for: request)
+        return performAuthorizedRequest(path: "/api/team/delete/", method: "DELETE")
             .map { _ in () }
-            .mapError { $0 as Error }
             .eraseToAnyPublisher()
     }
     
