@@ -1,0 +1,40 @@
+import Foundation
+
+struct TeamSnapshot: Identifiable, Codable {
+    let id: Int
+    let team: Team
+    let players: [Player]
+    let gameWeek: GameWeek
+    let snapshotDate: Date
+    let weeklyPoints: Int
+
+    enum CodingKeys: String, CodingKey {
+        case id, team, players
+        case gameWeek = "game_week"
+        case snapshotDate = "snapshot_date"
+        case weeklyPoints = "weekly_points"
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(Int.self, forKey: .id)
+        team = try container.decode(Team.self, forKey: .team)
+        players = try container.decode([Player].self, forKey: .players)
+        gameWeek = try container.decode(GameWeek.self, forKey: .gameWeek)
+        let dateStr = try container.decode(String.self, forKey: .snapshotDate)
+        guard let date = TeamSnapshot.dateFormatter.date(from: dateStr) else {
+            throw DecodingError.dataCorruptedError(forKey: .snapshotDate, in: container, debugDescription: "Invalid date format")
+        }
+        snapshotDate = date
+        weeklyPoints = try container.decode(Int.self, forKey: .weeklyPoints)
+    }
+
+    private static let dateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.calendar = Calendar(identifier: .gregorian)
+        f.locale = Locale(identifier: "en_GB")
+        f.timeZone = TimeZone(secondsFromGMT: 0)
+        f.dateFormat = "yyyy-MM-dd"
+        return f
+    }()
+}

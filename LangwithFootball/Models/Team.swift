@@ -8,13 +8,6 @@
 
 import Foundation
 
-struct Player: Codable, Identifiable {
-    let id: Int
-    let name: String
-    let position: String
-    // Add other fields as needed
-}
-
 struct Team: Codable {
     let id: Int
     let name: String
