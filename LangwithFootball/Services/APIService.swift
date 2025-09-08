@@ -157,4 +157,68 @@ class APIService {
             .decode(type: [Fixture].self, decoder: decoder)
             .eraseToAnyPublisher()
     }
+
+    /// Fetch all GameWeeks
+    func fetchGameWeeks() -> AnyPublisher<[GameWeek], Error> {
+        let request = makePublicRequest(path: "/api/gameweeks/")
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+
+        return URLSession.shared.dataTaskPublisher(for: request)
+            .tryMap { result in
+                guard let response = result.response as? HTTPURLResponse,
+                      200..<300 ~= response.statusCode else {
+                    throw URLError(.badServerResponse)
+                }
+                return result.data
+            }
+            .decode(type: [GameWeek].self, decoder: decoder)
+            .eraseToAnyPublisher()
+    }
+
+    /// Fetch all PlayerGameStats
+    func fetchPlayerGameStats() -> AnyPublisher<[PlayerGameStats], Error> {
+        let request = makePublicRequest(path: "/api/playergamestats/")
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+
+        return URLSession.shared.dataTaskPublisher(for: request)
+            .tryMap { result in
+                guard let response = result.response as? HTTPURLResponse,
+                      200..<300 ~= response.statusCode else {
+                    throw URLError(.badServerResponse)
+                }
+                return result.data
+            }
+            .decode(type: [PlayerGameStats].self, decoder: decoder)
+            .eraseToAnyPublisher()
+    }
+
+    /// Fetch all Team Snapshots
+    func fetchTeamSnapshots() -> AnyPublisher<[TeamSnapshot], Error> {
+        return performAuthorizedRequest(path: "/api/team/snapshots/")
+            .decode(type: [TeamSnapshot].self, decoder: JSONDecoder())
+            .eraseToAnyPublisher()
+    }
+
+    /// Fetch all Women's Fixtures
+    func fetchWomensFixtures() -> AnyPublisher<[WomensFixture], Error> {
+        let request = makePublicRequest(path: "/api/womensfixtures/")
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+
+        return URLSession.shared.dataTaskPublisher(for: request)
+            .tryMap { result in
+                guard let response = result.response as? HTTPURLResponse,
+                      200..<300 ~= response.statusCode else {
+                    throw URLError(.badServerResponse)
+                }
+                return result.data
+            }
+            .decode(type: [WomensFixture].self, decoder: decoder)
+            .eraseToAnyPublisher()
+    }
 }
