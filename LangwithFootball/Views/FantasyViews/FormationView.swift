@@ -27,7 +27,7 @@ struct FormationView: View {
                     .allowsHitTesting(false) // avoids unnecessary event processing
 
                 // LazyVStack renders only visible rows (we only have a few, but it's still cheaper)
-                LazyVStack(spacing: 30, pinnedViews: []) {
+                LazyVStack(spacing: 25, pinnedViews: []) {
                     ForEach(orderedPositions, id: \.self) { position in
                         if let playersForPosition = groupedPlayers[position] {
                             // LazyHStack is helpful if a row gets long (e.g., 5 forwards in drafts)

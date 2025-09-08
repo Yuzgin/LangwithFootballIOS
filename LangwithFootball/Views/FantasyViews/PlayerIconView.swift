@@ -11,29 +11,33 @@ struct PlayerIconView: View {
     let player: Player
 
     var body: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: 0) {
+            // Player icon
             Image(player.position == "Goalkeeper" ? "PlayerIconGK" : "PlayerIcon")
                 .resizable()
-                .interpolation(.low) // cheaper scaling
+                .interpolation(.low)
                 .scaledToFit()
-                .frame(width: 55, height: 55) // a touch smaller than before
+                .frame(width: 55, height: 55)
                 .clipShape(Circle())
+                .padding(.top, 6)
+                .padding(.bottom, 6)
 
+            // Full-width white strip for name
             Text(player.name)
                 .font(.caption2.weight(.semibold))
                 .multilineTextAlignment(.center)
                 .lineLimit(1)
-                .foregroundStyle(.white)
+                .foregroundColor(.black) // text readable on white
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 4)
+                .background(Color.white) // solid strip
         }
-        .padding(.vertical, 8)
-        .padding(.horizontal, 8)
-        .frame(width: 65) // compact card width
+        .frame(width: 65)
         .background(
-            // Solid, GPU-friendly background (no blur)
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .fill(Color.black.opacity(0.4))
         )
-        // Removed stroke & shadow to avoid extra offscreen renders
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .accessibilityElement(children: .combine)
         .accessibilityLabel(player.name)
     }
