@@ -26,6 +26,24 @@ struct Player: Codable, Identifiable {
         case penSaves = "Pen_Saves"
     }
     
+    // Memberwise initializer for previews and testing
+    init(id: Int, name: String, position: String, team: String?, goals: Int, assists: Int, yellowCards: Int, redCards: Int, cleanSheets: Int, gamesPlayed: Int, price: Double?, points: Int, motm: Int, penSaves: Int) {
+        self.id = id
+        self.name = name
+        self.position = position
+        self.team = team
+        self.goals = goals
+        self.assists = assists
+        self.yellowCards = yellowCards
+        self.redCards = redCards
+        self.cleanSheets = cleanSheets
+        self.gamesPlayed = gamesPlayed
+        self.price = price
+        self.points = points
+        self.motm = motm
+        self.penSaves = penSaves
+    }
+    
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         

@@ -44,7 +44,7 @@ struct FormationView: View {
                 LazyVStack(spacing: 25, pinnedViews: []) {
                     ForEach(orderedPositions, id: \.self) { position in
                         if let playersForPosition = groupedPlayers[position] {
-                            LazyHStack(spacing: 4) {
+                            LazyHStack(spacing: spacingForPlayerCount(playersForPosition.count)) {
                                 ForEach(playersForPosition) { player in
                                     PlayerIconView(
                                         player: player,
@@ -69,6 +69,19 @@ struct FormationView: View {
 
     private var orderedPositions: [String] {
         ["Attacker", "Midfielder", "Defender", "Goalkeeper"]
+    }
+    
+    private func spacingForPlayerCount(_ count: Int) -> CGFloat {
+        switch count {
+        case 5:
+            return 4
+        case 4:
+            return 10
+        case 3:
+            return 14
+        default:
+            return 17 // Default spacing for other cases
+        }
     }
 }
 

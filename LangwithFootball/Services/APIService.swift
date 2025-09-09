@@ -238,4 +238,57 @@ class APIService {
             .decode(type: [WomensFixture].self, decoder: decoder)
             .eraseToAnyPublisher()
     }
+    
+    /// Create a new team
+    func createTeam(teamData: CreateTeamRequest) -> AnyPublisher<Team, Error> {
+        return performAuthorizedRequestWithBody(path: "/api/team/", method: "POST", body: teamData)
+            .decode(type: Team.self, decoder: {
+                let decoder = JSONDecoder()
+                decoder.dateDecodingStrategy = .iso8601
+                return decoder
+            }())
+            .eraseToAnyPublisher()
+    }
+    
+    /// Perform an authenticated request with JSON body, attempting token refresh on 401 responses
+    private func performAuthorizedRequestWithBody<T: Codable>(path: String, method: String, body: T) -> AnyPublisher<Data, Error> {
+        var request = makeAuthRequest(path: path, method: method)
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        do {
+            request.httpBody = try JSONEncoder().encode(body)
+        } catch {
+            return Fail(error: error).eraseToAnyPublisher()
+        }
+        
+        return URLSession.shared.dataTaskPublisher(for: request)
+            .tryMap { data, response -> Data in
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    throw URLError(.badServerResponse)
+                }
+                if httpResponse.statusCode == 401 {
+                    throw APIError.unauthorized
+                }
+                guard 200..<300 ~= httpResponse.statusCode else {
+                    throw URLError(.badServerResponse)
+                }
+                return data
+            }
+            .mapError { $0 as Error }
+            .catch { [weak self] error -> AnyPublisher<Data, Error> in
+                guard let self = self else {
+                    return Fail(error: error).eraseToAnyPublisher()
+                }
+                if let apiError = error as? APIError, apiError == .unauthorized {
+                    return AuthService.shared.refreshTokensPublisher()
+                        .flatMap { _ in
+                            self.performAuthorizedRequestWithBody(path: path, method: method, body: body)
+                        }
+                        .eraseToAnyPublisher()
+                } else {
+                    return Fail(error: error).eraseToAnyPublisher()
+                }
+            }
+            .eraseToAnyPublisher()
+    }
 }

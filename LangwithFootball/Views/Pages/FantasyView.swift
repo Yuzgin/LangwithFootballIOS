@@ -8,68 +8,96 @@
 import SwiftUI
 
 struct FantasyView: View {
+    @EnvironmentObject var appState: AppState
     @StateObject private var viewModel = TeamSnapshotViewModel()
+    @StateObject private var createTeamViewModel = CreateTeamViewModel()
     @State private var showingTransferView = false
+    @State private var refreshTrigger = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            if let snapshot = viewModel.snapshots.sorted(by: { $0.snapshotDate > $1.snapshotDate }).first {
-                CurrentTeamSnapshotCard(
-                    teamName: snapshot.team.name,
-                    weeklyPoints: snapshot.weeklyPoints,
-                    gameWeek: snapshot.gameWeek.week
-                )
+        if appState.isLoggedIn {
+            // Show fantasy content when logged in
+            VStack(alignment: .leading, spacing: 20) {
+                if createTeamViewModel.hasTeam {
+                    // User has a team - show normal fantasy view
+                    if let snapshot = viewModel.snapshots.sorted(by: { $0.snapshotDate > $1.snapshotDate }).first {
+                        CurrentTeamSnapshotCard(
+                            teamName: snapshot.team.name,
+                            weeklyPoints: snapshot.weeklyPoints,
+                            gameWeek: snapshot.gameWeek.week
+                        )
 
-                FormationView(
-                    players: snapshot.players,
-                    playerWeeklyPoints: Dictionary(uniqueKeysWithValues: snapshot.players.map { ($0.id, $0.points) })
-                )
-                .transition(.opacity.combined(with: .move(edge: .bottom)))
-                
-                // Transfers Button
-                Button(action: {
-                    showingTransferView = true
-                }) {
-                    HStack {
-                        Image(systemName: "arrow.left.arrow.right")
-                            .font(.title2)
-                        Text("Make Transfers")
-                            .font(.headline.weight(.semibold))
-                    }
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(
-                                LinearGradient(
-                                    colors: [Color.blue, Color.purple],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
+                        FormationView(
+                            players: snapshot.players,
+                            playerWeeklyPoints: Dictionary(uniqueKeysWithValues: snapshot.players.map { ($0.id, $0.points) })
+                        )
+                        .transition(.opacity.combined(with: .move(edge: .bottom)))
+                        
+                        // Transfers Button
+                        Button(action: {
+                            showingTransferView = true
+                        }) {
+                            HStack {
+                                Image(systemName: "arrow.left.arrow.right")
+                                    .font(.title2)
+                                Text("Make Transfers")
+                                    .font(.headline.weight(.semibold))
+                            }
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [Color.blue, Color.purple],
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        )
+                                    )
                             )
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .strokeBorder(.white.opacity(0.3), lineWidth: 1)
-                    )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .strokeBorder(.white.opacity(0.3), lineWidth: 1)
+                            )
+                        }
+                        .padding(.horizontal)
+                        
+                    } else if let error = viewModel.errorMessage {
+                        Text(error)
+                            .foregroundColor(.red)
+                            .font(.title3)
+                            .padding(.vertical, 8)
+                    } else {
+                        ProgressView("Loading current team…")
+                            .font(.title3)
+                    }
+                } else {
+                    // User doesn't have a team - show create team view
+                    CreateTeamView()
+                        .environmentObject(createTeamViewModel)
+                        .onAppear {
+                            // Refresh team status when view appears
+                            createTeamViewModel.checkIfUserHasTeam()
+                        }
+                        .onChange(of: createTeamViewModel.hasTeam) { hasTeam in
+                            if hasTeam {
+                                viewModel.fetchTeamSnapshots()
+                            }
+                        }
                 }
-                .padding(.horizontal)
-                
-            } else if let error = viewModel.errorMessage {
-                Text(error)
-                    .foregroundColor(.red)
-                    .font(.title3)
-                    .padding(.vertical, 8)
-            } else {
-                ProgressView("Loading current team…")
-                    .font(.title3)
             }
-        }
-        .padding()
-        .onAppear { viewModel.fetchTeamSnapshots() }
-        .sheet(isPresented: $showingTransferView) {
-            TransferView()
+            .padding()
+            .onAppear { 
+                viewModel.fetchTeamSnapshots()
+                createTeamViewModel.checkIfUserHasTeam()
+            }
+            .sheet(isPresented: $showingTransferView) {
+                TransferView()
+            }
+        } else {
+            // Show login form when not logged in
+            LoginView()
         }
     }
 }

@@ -22,11 +22,7 @@ struct ContentView: View {
     func selectedContentView(for type: String) -> some View {
         switch type {
         case "Home":
-            if appState.isLoggedIn {
-                HomeView()
-            } else {
-                LoginView()
-            }
+            HomeView()
         case "Fantasy":
             FantasyView()
         case "Fixtures":
@@ -43,8 +39,12 @@ struct ContentView: View {
     var body: some View {
         ZStack {
             // GLOBAL BACKGROUND COLOR
-            Color(.systemGray6)
-                .ignoresSafeArea()
+            LinearGradient(
+                colors: [Color.black, Color(red: 0.2, green: 0.15, blue: 0.0)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .ignoresSafeArea()
 
             ResizableHeaderScrollView {
                 VStack(spacing: 6) {
@@ -55,7 +55,7 @@ struct ContentView: View {
                             .font(.title)
                             .fontWeight(.heavy)
                             .foregroundStyle(.black.opacity(0.9))
-                            .shadow(color: .black.opacity(0.08), radius: 1, x: 0, y: 1)
+                            .shadow(color: .white.opacity(0.3), radius: 2, x: 0, y: 1)
                         Spacer()
                     }
                     .padding(.top, 15)

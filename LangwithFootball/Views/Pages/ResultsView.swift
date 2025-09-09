@@ -312,137 +312,132 @@ struct ResultsView: View {
     }
 
     var body: some View {
-        NavigationView {
-            ZStack(alignment: .top) {
-                // Content
-                List {
-                    ForEach(filteredMatches) { match in
-                        VStack(spacing: 8) {
-                            HStack {
-                                // HOME label (right-aligned, badge on right)
-                                homeTeamLabel(match.team1)
+        ZStack(alignment: .top) {
+            // Content
+            VStack(spacing: 0) {
+                ForEach(filteredMatches) { match in
+                    VStack(spacing: 8) {
+                        HStack {
+                            // HOME label (right-aligned, badge on right)
+                            homeTeamLabel(match.team1)
 
-                                Text("\(match.team1Score) - \(match.team2Score)")
-                                    .font(.title3)
-                                    .fontWeight(.semibold)
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 6)
-                                    .scaleEffect(0.9)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 10)
-                                            .fill(Color.gray.opacity(0.15))
-                                    )
+                            Text("\(match.team1Score) - \(match.team2Score)")
+                                .font(.title3)
+                                .fontWeight(.semibold)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .scaleEffect(0.9)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .fill(Color.gray.opacity(0.15))
+                                )
 
-                                // AWAY label (left-aligned, badge on left)
-                                awayTeamLabel(match.team2)
-                            }
+                            // AWAY label (left-aligned, badge on left)
+                            awayTeamLabel(match.team2)
+                        }
 
-                            Text(formattedDate(match.date))
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
+                        Text(formattedDate(match.date))
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .scaleEffect(0.7)
+
+                        if let gameWeek = match.gameWeek {
+                            Text("Game Week \(gameWeek)")
+                                .font(.caption)
+                                .foregroundColor(.gray)
                                 .scaleEffect(0.7)
-
-                            if let gameWeek = match.gameWeek {
-                                Text("Game Week \(gameWeek)")
-                                    .font(.caption)
-                                    .foregroundColor(.gray)
-                                    .scaleEffect(0.7)
+                        }
+                    }
+                    .padding(.vertical, 12)
+                    .padding(.horizontal, 16)
+                    .background(
+                        LinearGradient(
+                            gradient: Gradient(colors: [Color(.systemGray6), Color(.systemGray5)]),
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                    )
+                    // —— home/away side bars with hierarchy (Langwith only) ——
+                    .overlay(
+                        ZStack {
+                            HStack(spacing: 0) {
+                                gradientBar(for: match.team1)
+                                Spacer(minLength: 0)
+                            }
+                            HStack(spacing: 0) {
+                                Spacer(minLength: 0)
+                                gradientBar(for: match.team2)
                             }
                         }
-                        .padding(.vertical, 12)
-                        .padding(.horizontal, 16)
-                        .background(
-                            LinearGradient(
-                                gradient: Gradient(colors: [Color(.systemGray6), Color(.systemGray5)]),
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                        )
-                        // —— home/away side bars with hierarchy (Langwith only) ——
-                        .overlay(
-                            ZStack {
-                                HStack(spacing: 0) {
-                                    gradientBar(for: match.team1)
-                                    Spacer(minLength: 0)
-                                }
-                                HStack(spacing: 0) {
-                                    Spacer(minLength: 0)
-                                    gradientBar(for: match.team2)
-                                }
-                            }
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color.primary.opacity(0.08), lineWidth: 1)
-                        )
-                        .shadow(color: .black.opacity(0.08), radius: 4, x: 0, y: 2)
-                        .padding(.vertical, 6)
-                        .padding(.horizontal, 12)
-                        .listRowSeparator(.hidden)
-                        .listRowInsets(EdgeInsets())
-                    }
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+                    )
+                    .shadow(color: .black.opacity(0.08), radius: 4, x: 0, y: 2)
+                    .padding(.vertical, 6)
+                    .padding(.horizontal, 12)
                 }
-                .listStyle(.plain)
-                .padding(.top, 44)
+            }
+            .padding(.top, 44)
 
-                // Floating filter pill
-                Menu {
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            selectedTeam = nil
-                        }
-                    } label: {
-                        Label("All Teams", systemImage: selectedTeam == nil ? "checkmark" : "circle")
-                    }
-
-                    Divider()
-
-                    ForEach(LangwithTeam.allCases) { team in
-                        Button {
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                selectedTeam = team
-                            }
-                        } label: {
-                            HStack {
-                                Text(team.rawValue)
-                                Spacer()
-                                if selectedTeam == team { Image(systemName: "checkmark") }
-                            }
-                        }
+            // Floating filter pill
+            Menu {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        selectedTeam = nil
                     }
                 } label: {
-                    HStack(spacing: 6) {
-                        Text(selectedTeam?.rawValue ?? "All Teams")
-                            .lineLimit(1)
-                        Image(systemName: "chevron.down")
-                            .font(.caption)
+                    Label("All Teams", systemImage: selectedTeam == nil ? "checkmark" : "circle")
+                }
+
+                Divider()
+
+                ForEach(LangwithTeam.allCases) { team in
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            selectedTeam = team
+                        }
+                    } label: {
+                        HStack {
+                            Text(team.rawValue)
+                            Spacer()
+                            if selectedTeam == team { Image(systemName: "checkmark") }
+                        }
                     }
-                    .font(.subheadline)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .background(.ultraThinMaterial, in: Capsule())
-                    .overlay(
-                        Capsule().strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
-                    )
-                    .shadow(color: .black.opacity(0.08), radius: 10, x: 0, y: 4)
                 }
-                .padding(.top, 6)
-                .padding(.horizontal, 16)
-                .frame(maxWidth: .infinity, alignment: .top)
-                .zIndex(1)
+            } label: {
+                HStack(spacing: 6) {
+                    Text(selectedTeam?.rawValue ?? "All Teams")
+                        .lineLimit(1)
+                    Image(systemName: "chevron.down")
+                        .font(.caption)
+                }
+                .font(.subheadline)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(.ultraThinMaterial, in: Capsule())
+                .overlay(
+                    Capsule().strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+                )
+                .shadow(color: .black.opacity(0.08), radius: 10, x: 0, y: 4)
             }
-            .onAppear { viewModel.fetchMatches() }
-            .overlay {
-                if let error = viewModel.errorMessage {
-                    Text(error)
-                        .foregroundColor(.red)
-                        .multilineTextAlignment(.center)
-                        .padding()
-                } else if viewModel.matches.isEmpty {
-                    ProgressView("Loading...")
-                }
+            .padding(.top, 6)
+            .padding(.horizontal, 16)
+            .frame(maxWidth: .infinity, alignment: .top)
+            .zIndex(1)
+        }
+        .onAppear { viewModel.fetchMatches() }
+        .overlay {
+            if let error = viewModel.errorMessage {
+                Text(error)
+                    .foregroundColor(.red)
+                    .multilineTextAlignment(.center)
+                    .padding()
+            } else if viewModel.matches.isEmpty {
+                ProgressView("Loading...")
             }
         }
     }

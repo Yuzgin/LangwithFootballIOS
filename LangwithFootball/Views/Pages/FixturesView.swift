@@ -299,134 +299,129 @@ struct FixturesView: View {
     }
 
     var body: some View {
-        NavigationView {
-            ZStack(alignment: .top) {
-                // Content
-                List {
-                    ForEach(displayedFixtures) { df in
-                        VStack(spacing: 8) {
-                            HStack {
-                                homeTeamLabel(df.left)
+        ZStack(alignment: .top) {
+            // Content
+            VStack(spacing: 0) {
+                ForEach(displayedFixtures) { df in
+                    VStack(spacing: 8) {
+                        HStack {
+                            homeTeamLabel(df.left)
 
-                                Text("vs")
-                                    .font(.title3).fontWeight(.semibold)
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 6)
-                                    .scaleEffect(0.9)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 10)
-                                            .fill(Color.gray.opacity(0.15))
-                                    )
+                            Text("vs")
+                                .font(.title3).fontWeight(.semibold)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .scaleEffect(0.9)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .fill(Color.gray.opacity(0.15))
+                                )
 
-                                awayTeamLabel(df.right)
-                            }
+                            awayTeamLabel(df.right)
+                        }
 
-                            Text(formattedDateTime(date: df.fixture.date, time: df.fixture.time))
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
+                        Text(formattedDateTime(date: df.fixture.date, time: df.fixture.time))
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .scaleEffect(0.7)
+
+                        if let gw = df.fixture.gameWeek {
+                            Text("Game Week \(gw)")
+                                .font(.caption)
+                                .foregroundColor(.gray)
                                 .scaleEffect(0.7)
-
-                            if let gw = df.fixture.gameWeek {
-                                Text("Game Week \(gw)")
-                                    .font(.caption)
-                                    .foregroundColor(.gray)
-                                    .scaleEffect(0.7)
+                        }
+                    }
+                    .padding(.vertical, 12)
+                    .padding(.horizontal, 16)
+                    .background(
+                        LinearGradient(
+                            gradient: Gradient(colors: [Color(.systemGray6), Color(.systemGray5)]),
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                    )
+                    // side bars use the displayed sides too
+                    .overlay(
+                        ZStack {
+                            HStack(spacing: 0) {
+                                gradientBar(for: df.left)
+                                Spacer(minLength: 0)
+                            }
+                            HStack(spacing: 0) {
+                                Spacer(minLength: 0)
+                                gradientBar(for: df.right)
                             }
                         }
-                        .padding(.vertical, 12)
-                        .padding(.horizontal, 16)
-                        .background(
-                            LinearGradient(
-                                gradient: Gradient(colors: [Color(.systemGray6), Color(.systemGray5)]),
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                        )
-                        // side bars use the displayed sides too
-                        .overlay(
-                            ZStack {
-                                HStack(spacing: 0) {
-                                    gradientBar(for: df.left)
-                                    Spacer(minLength: 0)
-                                }
-                                HStack(spacing: 0) {
-                                    Spacer(minLength: 0)
-                                    gradientBar(for: df.right)
-                                }
-                            }
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color.primary.opacity(0.08), lineWidth: 1)
-                        )
-                        .shadow(color: .black.opacity(0.08), radius: 4, x: 0, y: 2)
-                        .padding(.vertical, 6)
-                        .padding(.horizontal, 12)
-                        .listRowSeparator(.hidden)
-                        .listRowInsets(EdgeInsets())
-                    }
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+                    )
+                    .shadow(color: .black.opacity(0.08), radius: 4, x: 0, y: 2)
+                    .padding(.vertical, 6)
+                    .padding(.horizontal, 12)
                 }
-                .listStyle(.plain)
-                .padding(.top, 44)
+            }
+            .padding(.top, 44)
 
-                // Floating filter pill
-                Menu {
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            selectedTeam = nil
-                        }
-                    } label: {
-                        Label("All Teams", systemImage: selectedTeam == nil ? "checkmark" : "circle")
-                    }
-
-                    Divider()
-
-                    ForEach(LangwithTeam.allCases) { team in
-                        Button {
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                selectedTeam = team
-                            }
-                        } label: {
-                            HStack {
-                                Text(team.rawValue)
-                                Spacer()
-                                if selectedTeam == team { Image(systemName: "checkmark") }
-                            }
-                        }
+            // Floating filter pill
+            Menu {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        selectedTeam = nil
                     }
                 } label: {
-                    HStack(spacing: 6) {
-                        Text(selectedTeam?.rawValue ?? "All Teams")
-                            .lineLimit(1)
-                        Image(systemName: "chevron.down")
-                            .font(.caption)
+                    Label("All Teams", systemImage: selectedTeam == nil ? "checkmark" : "circle")
+                }
+
+                Divider()
+
+                ForEach(LangwithTeam.allCases) { team in
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            selectedTeam = team
+                        }
+                    } label: {
+                        HStack {
+                            Text(team.rawValue)
+                            Spacer()
+                            if selectedTeam == team { Image(systemName: "checkmark") }
+                        }
                     }
-                    .font(.subheadline)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .background(.ultraThinMaterial, in: Capsule())
-                    .overlay(
-                        Capsule().strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
-                    )
-                    .shadow(color: .black.opacity(0.08), radius: 10, x: 0, y: 4)
                 }
-                .padding(.top, 6)
-                .padding(.horizontal, 16)
-                .frame(maxWidth: .infinity, alignment: .top)
-                .zIndex(1)
+            } label: {
+                HStack(spacing: 6) {
+                    Text(selectedTeam?.rawValue ?? "All Teams")
+                        .lineLimit(1)
+                    Image(systemName: "chevron.down")
+                        .font(.caption)
+                }
+                .font(.subheadline)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(.ultraThinMaterial, in: Capsule())
+                .overlay(
+                    Capsule().strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+                )
+                .shadow(color: .black.opacity(0.08), radius: 10, x: 0, y: 4)
             }
-            .onAppear { viewModel.fetchFixtures() }
-            .overlay {
-                if let error = viewModel.errorMessage {
-                    Text(error)
-                        .foregroundColor(.red)
-                        .multilineTextAlignment(.center)
-                        .padding()
-                } else if viewModel.fixtures.isEmpty {
-                    ProgressView("Loading...")
-                }
+            .padding(.top, 6)
+            .padding(.horizontal, 16)
+            .frame(maxWidth: .infinity, alignment: .top)
+            .zIndex(1)
+        }
+        .onAppear { viewModel.fetchFixtures() }
+        .overlay {
+            if let error = viewModel.errorMessage {
+                Text(error)
+                    .foregroundColor(.red)
+                    .multilineTextAlignment(.center)
+                    .padding()
+            } else if viewModel.fixtures.isEmpty {
+                ProgressView("Loading...")
             }
         }
     }

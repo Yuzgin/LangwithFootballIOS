@@ -8,15 +8,74 @@
 import SwiftUI
 
 struct SettingsView: View {
+    @EnvironmentObject var appState: AppState
+    @State private var showingLoginView = false
+    
     var body: some View {
-        Text("Settings Page")
-            .font(.largeTitle)
-            .fontWeight(.bold)
-            .fixedSize(horizontal: true, vertical: false)
-            .padding()
+        VStack(spacing: 20) {
+            Text("Settings")
+                .font(.largeTitle)
+                .fontWeight(.bold)
+                .padding(.top)
+            
+            if appState.isLoggedIn {
+                // Show logout button when logged in
+                VStack(spacing: 16) {
+                    Text("Welcome to Settings!")
+                        .font(.headline)
+                        .foregroundColor(.secondary)
+                    
+                    Button("Logout") {
+                        UserDefaults.standard.removeObject(forKey: "accessToken")
+                        UserDefaults.standard.removeObject(forKey: "refreshToken")
+                        appState.isLoggedIn = false
+                    }
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color.red)
+                    )
+                    .padding(.horizontal)
+                }
+            } else {
+                // Show login button when not logged in
+                VStack(spacing: 16) {
+                    Text("Please log in to access settings")
+                        .font(.headline)
+                        .foregroundColor(.secondary)
+                    
+                    Button("Login") {
+                        showingLoginView = true
+                    }
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color.blue)
+                    )
+                    .padding(.horizontal)
+                }
+            }
+            
+            Spacer()
+        }
+        .padding()
+        .sheet(isPresented: $showingLoginView) {
+            LoginView()
+        }
+        .onChange(of: appState.isLoggedIn) { isLoggedIn in
+            // Dismiss the login sheet when user successfully logs in
+            if isLoggedIn {
+                showingLoginView = false
+            }
+        }
     }
 }
 
 #Preview {
     SettingsView()
+        .environmentObject(AppState())
 }
