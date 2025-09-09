@@ -25,4 +25,29 @@ struct Player: Codable, Identifiable {
         case motm = "MOTM"
         case penSaves = "Pen_Saves"
     }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        
+        id = try container.decode(Int.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        position = try container.decode(String.self, forKey: .position)
+        team = try container.decodeIfPresent(String.self, forKey: .team)
+        goals = try container.decode(Int.self, forKey: .goals)
+        assists = try container.decode(Int.self, forKey: .assists)
+        yellowCards = try container.decode(Int.self, forKey: .yellowCards)
+        redCards = try container.decode(Int.self, forKey: .redCards)
+        cleanSheets = try container.decode(Int.self, forKey: .cleanSheets)
+        gamesPlayed = try container.decode(Int.self, forKey: .gamesPlayed)
+        points = try container.decode(Int.self, forKey: .points)
+        motm = try container.decode(Int.self, forKey: .motm)
+        penSaves = try container.decode(Int.self, forKey: .penSaves)
+        
+        // Handle price as either String or Double
+        if let priceString = try? container.decode(String.self, forKey: .price) {
+            price = Double(priceString)
+        } else {
+            price = try container.decodeIfPresent(Double.self, forKey: .price)
+        }
+    }
 }

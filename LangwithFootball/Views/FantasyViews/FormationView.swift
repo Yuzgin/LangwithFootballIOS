@@ -9,6 +9,21 @@ import SwiftUI
 
 struct FormationView: View {
     let players: [Player]
+    let playerWeeklyPoints: [Int: Int]?
+    let showSplitInfo: Bool
+    let metric: PlayerInfoMetric
+
+    init(
+        players: [Player],
+        playerWeeklyPoints: [Int: Int]? = nil,
+        showSplitInfo: Bool = true,
+        metric: PlayerInfoMetric = .points
+    ) {
+        self.players = players
+        self.playerWeeklyPoints = playerWeeklyPoints
+        self.showSplitInfo = showSplitInfo
+        self.metric = metric
+    }
 
     var groupedPlayers: [String: [Player]] {
         Dictionary(grouping: players, by: { $0.position })
@@ -19,21 +34,24 @@ struct FormationView: View {
             ZStack(alignment: .top) {
                 Image("Pitch")
                     .resizable()
-                    .interpolation(.low) // cheaper scaling for the big background
+                    .interpolation(.low)
                     .scaledToFit()
                     .frame(maxWidth: .infinity)
                     .clipped()
                     .cornerRadius(20)
-                    .allowsHitTesting(false) // avoids unnecessary event processing
+                    .allowsHitTesting(false)
 
-                // LazyVStack renders only visible rows (we only have a few, but it's still cheaper)
                 LazyVStack(spacing: 25, pinnedViews: []) {
                     ForEach(orderedPositions, id: \.self) { position in
                         if let playersForPosition = groupedPlayers[position] {
-                            // LazyHStack is helpful if a row gets long (e.g., 5 forwards in drafts)
                             LazyHStack(spacing: 4) {
                                 ForEach(playersForPosition) { player in
-                                    PlayerIconView(player: player)
+                                    PlayerIconView(
+                                        player: player,
+                                        weeklyPoints: playerWeeklyPoints?[player.id],
+                                        showSplitInfo: showSplitInfo,
+                                        metric: metric
+                                    )
                                 }
                             }
                         }

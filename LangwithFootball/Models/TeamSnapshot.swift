@@ -9,7 +9,7 @@ struct TeamSnapshot: Identifiable, Codable {
     let weeklyPoints: Int
 
     enum CodingKeys: String, CodingKey {
-        case id, team, players
+        case team, players
         case gameWeek = "game_week"
         case snapshotDate = "snapshot_date"
         case weeklyPoints = "weekly_points"
@@ -17,7 +17,6 @@ struct TeamSnapshot: Identifiable, Codable {
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        id = try container.decode(Int.self, forKey: .id)
         team = try container.decode(Team.self, forKey: .team)
         players = try container.decode([Player].self, forKey: .players)
         gameWeek = try container.decode(GameWeek.self, forKey: .gameWeek)
@@ -27,6 +26,9 @@ struct TeamSnapshot: Identifiable, Codable {
         }
         snapshotDate = date
         weeklyPoints = try container.decode(Int.self, forKey: .weeklyPoints)
+        
+        // Generate a unique ID from team ID and snapshot date
+        id = team.id.hashValue ^ snapshotDate.hashValue
     }
 
     private static let dateFormatter: DateFormatter = {

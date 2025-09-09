@@ -8,33 +8,76 @@
 import SwiftUI
 
 struct FantasyView: View {
-    @StateObject private var viewModel = FantasyViewModel()
+    @StateObject private var viewModel = TeamSnapshotViewModel()
+    @State private var showingTransferView = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            if let team = viewModel.team {
-                TeamInfoCard(teamName: team.name, totalPoints: team.totalPoints)
+            if let snapshot = viewModel.snapshots.sorted(by: { $0.snapshotDate > $1.snapshotDate }).first {
+                CurrentTeamSnapshotCard(
+                    teamName: snapshot.team.name,
+                    weeklyPoints: snapshot.weeklyPoints,
+                    gameWeek: snapshot.gameWeek.week
+                )
 
-                FormationView(players: team.players)
-                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+                FormationView(
+                    players: snapshot.players,
+                    playerWeeklyPoints: Dictionary(uniqueKeysWithValues: snapshot.players.map { ($0.id, $0.points) })
+                )
+                .transition(.opacity.combined(with: .move(edge: .bottom)))
+                
+                // Transfers Button
+                Button(action: {
+                    showingTransferView = true
+                }) {
+                    HStack {
+                        Image(systemName: "arrow.left.arrow.right")
+                            .font(.title2)
+                        Text("Make Transfers")
+                            .font(.headline.weight(.semibold))
+                    }
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(
+                                LinearGradient(
+                                    colors: [Color.blue, Color.purple],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .strokeBorder(.white.opacity(0.3), lineWidth: 1)
+                    )
+                }
+                .padding(.horizontal)
+                
             } else if let error = viewModel.errorMessage {
                 Text(error)
                     .foregroundColor(.red)
                     .font(.title3)
                     .padding(.vertical, 8)
             } else {
-                ProgressView("Loading team…")
+                ProgressView("Loading current team…")
                     .font(.title3)
             }
         }
         .padding()
-        .onAppear { viewModel.fetchTeam() }
+        .onAppear { viewModel.fetchTeamSnapshots() }
+        .sheet(isPresented: $showingTransferView) {
+            TransferView()
+        }
     }
 }
 
-private struct TeamInfoCard: View {
+private struct CurrentTeamSnapshotCard: View {
     let teamName: String
-    let totalPoints: Int
+    let weeklyPoints: Int
+    let gameWeek: Int
 
     var body: some View {
         HStack(alignment: .center, spacing: 20) {
@@ -56,13 +99,17 @@ private struct TeamInfoCard: View {
                 Text(teamName)
                     .font(.title.weight(.bold))
                     .foregroundStyle(.white)
+                
+                Text("Game Week \(gameWeek)")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.white.opacity(0.8))
 
                 HStack(spacing: 10) {
-                    Text("Total Points")
+                    Text("This Week")
                         .font(.headline)
                         .foregroundStyle(.white.opacity(0.9))
 
-                    Text("\(totalPoints)")
+                    Text("\(weeklyPoints)")
                         .font(.headline.weight(.bold))
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
@@ -73,7 +120,7 @@ private struct TeamInfoCard: View {
                             Capsule().stroke(.white.opacity(0.25), lineWidth: 1)
                         )
                         .foregroundStyle(.white)
-                        .accessibilityLabel("Total points \(totalPoints)")
+                        .accessibilityLabel("This week points \(weeklyPoints)")
                 }
             }
 

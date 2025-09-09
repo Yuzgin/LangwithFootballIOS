@@ -84,10 +84,27 @@ class APIService {
     
     /// Fetch the current user's team
     func fetchTeam() -> AnyPublisher<Team, Error> {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+
         return performAuthorizedRequest(path: "/api/team/")
-            .decode(type: Team.self, decoder: JSONDecoder())
+            // Peek at the raw response body
+            .handleEvents(receiveOutput: { data in
+                if let body = String(data: data, encoding: .utf8) {
+                    print("📦 Response body:\n\(body)")
+                } else {
+                    print("📦 Response body (non-UTF8, \(data.count) bytes)")
+                }
+            })
+            .decode(type: Team.self, decoder: decoder)
+            .mapError { error in
+                // Helpful debug for decoding or transport errors
+                print("❌ fetchTeam error:", error)
+                return error
+            }
             .eraseToAnyPublisher()
     }
+    
     
     /// Delete the current user's team
     func deleteTeam() -> AnyPublisher<Void, Error> {
@@ -198,7 +215,7 @@ class APIService {
 
     /// Fetch all Team Snapshots
     func fetchTeamSnapshots() -> AnyPublisher<[TeamSnapshot], Error> {
-        return performAuthorizedRequest(path: "/api/team/snapshots/")
+        return performAuthorizedRequest(path: "/api/team-snapshots/")
             .decode(type: [TeamSnapshot].self, decoder: JSONDecoder())
             .eraseToAnyPublisher()
     }
