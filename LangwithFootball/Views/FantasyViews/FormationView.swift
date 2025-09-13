@@ -59,12 +59,11 @@ struct FormationView: View {
                 }
                 .padding(.top, 10)
                 .padding(.horizontal)
-                .padding(.bottom, 60)
+                .padding(.bottom, 16)
             }
         }
         .scrollIndicators(.hidden)
         .background(Color.black.opacity(0.05))
-        .edgesIgnoringSafeArea(.bottom)
     }
 
     private var orderedPositions: [String] {

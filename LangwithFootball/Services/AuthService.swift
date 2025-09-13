@@ -8,9 +8,19 @@
 import Foundation
 import Combine
 
+// Notification for when user needs to be logged out due to token issues
+extension Notification.Name {
+    static let userLoggedOut = Notification.Name("userLoggedOut")
+}
+
 class AuthService {
     static let shared = AuthService()
     private let baseURL = "https://www.langwithfootball.com"
+    
+    // Prevent concurrent refresh attempts
+    private var isRefreshing = false
+    private let refreshQueue = DispatchQueue(label: "refreshQueue", attributes: .concurrent)
+    private let refreshSemaphore = DispatchSemaphore(value: 1)
     
     private init() {}
     
@@ -27,7 +37,28 @@ class AuthService {
 
     /// Refresh the access token using the saved refresh token
     private func refreshAccessToken(completion: @escaping (Result<Void, Error>) -> Void) {
+        // Prevent concurrent refresh attempts
+        refreshQueue.async(flags: .barrier) {
+            guard !self.isRefreshing else {
+                // If already refreshing, wait for it to complete
+                DispatchQueue.global().async {
+                    self.refreshSemaphore.wait()
+                    self.refreshSemaphore.signal()
+                    // Try again after the current refresh completes
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        self.refreshAccessToken(completion: completion)
+                    }
+                }
+                return
+            }
+            
+            self.isRefreshing = true
+            self.refreshSemaphore.wait()
+        }
+        
         guard let refresh = UserDefaults.standard.string(forKey: "refreshToken") else {
+            self.isRefreshing = false
+            self.refreshSemaphore.signal()
             let err = NSError(domain: "", code: -4, userInfo: [NSLocalizedDescriptionKey: "No refresh token available"])
             completion(.failure(err))
             return
@@ -42,15 +73,44 @@ class AuthService {
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)
 
         URLSession.shared.dataTask(with: request) { data, response, error in
+            defer {
+                self.isRefreshing = false
+                self.refreshSemaphore.signal()
+            }
+            
             if let error = error {
                 completion(.failure(error))
                 return
             }
 
+            // Check HTTP status code
+            if let httpResponse = response as? HTTPURLResponse {
+                switch httpResponse.statusCode {
+                case 200...299:
+                    // Success - continue processing
+                    break
+                case 401:
+                    // Refresh token is invalid/expired
+                    let err = NSError(domain: "", code: -6, userInfo: [NSLocalizedDescriptionKey: "Refresh token expired or invalid"])
+                    completion(.failure(err))
+                    return
+                case 400:
+                    // Bad request - refresh token malformed
+                    let err = NSError(domain: "", code: -7, userInfo: [NSLocalizedDescriptionKey: "Invalid refresh token format"])
+                    completion(.failure(err))
+                    return
+                default:
+                    // Other server errors
+                    let err = NSError(domain: "", code: -8, userInfo: [NSLocalizedDescriptionKey: "Server error during token refresh: \(httpResponse.statusCode)"])
+                    completion(.failure(err))
+                    return
+                }
+            }
+
             guard let data = data,
                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                   let newAccess = json["access"] as? String else {
-                let err = NSError(domain: "", code: -5, userInfo: [NSLocalizedDescriptionKey: "Invalid refresh response"])
+                let err = NSError(domain: "", code: -5, userInfo: [NSLocalizedDescriptionKey: "Invalid refresh response format"])
                 completion(.failure(err))
                 return
             }
@@ -136,6 +196,22 @@ class AuthService {
     /// Check login state
     func isLoggedIn() -> Bool {
         UserDefaults.standard.string(forKey: "accessToken") != nil
+    }
+    
+    /// Logout user and clear all tokens
+    func logout() {
+        UserDefaults.standard.removeObject(forKey: "accessToken")
+        UserDefaults.standard.removeObject(forKey: "refreshToken")
+        isRefreshing = false
+        // Notify UI that user has been logged out
+        NotificationCenter.default.post(name: .userLoggedOut, object: nil)
+    }
+    
+    /// Check if refresh token is expired (basic check)
+    private func isRefreshTokenExpired() -> Bool {
+        // For now, we'll let the server handle refresh token validation
+        // In a production app, you might want to decode the JWT to check expiration
+        return false
     }
 }
 

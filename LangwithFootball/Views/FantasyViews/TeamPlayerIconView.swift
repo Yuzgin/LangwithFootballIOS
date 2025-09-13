@@ -7,11 +7,34 @@
 
 import SwiftUI
 
+enum TeamPlayerIconContext {
+    case createTeam
+    case transfer
+    case fantasy
+}
+
 struct TeamPlayerIconView: View {
     let position: String
     let selectedPlayer: Player?
     let onTap: () -> Void
     let onDeselect: () -> Void
+    let context: TeamPlayerIconContext
+    @State private var showingPlayerDetail = false
+    @State private var showingTransferAction = false
+    
+    init(
+        position: String,
+        selectedPlayer: Player?,
+        onTap: @escaping () -> Void,
+        onDeselect: @escaping () -> Void,
+        context: TeamPlayerIconContext = .createTeam
+    ) {
+        self.position = position
+        self.selectedPlayer = selectedPlayer
+        self.onTap = onTap
+        self.onDeselect = onDeselect
+        self.context = context
+    }
     
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -38,7 +61,7 @@ struct TeamPlayerIconView: View {
                         .frame(width: 55, height: 55)
                         .clipShape(Circle())
                         .padding(.top, 6)
-                        .opacity(0.8)
+                        .opacity(0.95)
                 }
                 
                 Spacer()
@@ -60,6 +83,37 @@ struct TeamPlayerIconView: View {
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .accessibilityElement(children: .combine)
         .accessibilityLabel(selectedPlayer?.name ?? "\(position) position")
+        .onTapGesture {
+            if let player = selectedPlayer {
+                switch context {
+                case .transfer:
+                    showingTransferAction = true
+                case .createTeam, .fantasy:
+                    showingPlayerDetail = true
+                }
+            } else {
+                onTap()
+            }
+        }
+        .sheet(isPresented: $showingPlayerDetail) {
+            if let player = selectedPlayer {
+                PlayerDetailModal(player: player, weeklyPoints: nil)
+            }
+        }
+        .sheet(isPresented: $showingTransferAction) {
+            if let player = selectedPlayer {
+                TransferPlayerActionModal(
+                    player: player,
+                    position: position,
+                    onRemovePlayer: {
+                        onDeselect()
+                    },
+                    onSelectReplacement: {
+                        onTap()
+                    }
+                )
+            }
+        }
     }
 }
 
@@ -69,10 +123,23 @@ private struct TeamPlayerInfoCard: View {
     let onTap: () -> Void
     let onDeselect: () -> Void
     
+    private var positionAbbreviation: String {
+        if position.hasPrefix("Attacker") {
+            return "ATT"
+        } else if position.hasPrefix("Midfielder") {
+            return "MID"
+        } else if position.hasPrefix("Defender") {
+            return "DEF"
+        } else if position.hasPrefix("Goalkeeper") {
+            return "GK"
+        }
+        return position
+    }
+    
     var body: some View {
         Group {
             if let player = player {
-                // Player selected - show player info with deselect option
+                // Player selected - show player info with deselect option (matching PlayerInfoCard style)
                 VStack(spacing: 0) {
                     Text(player.name)
                         .font(.caption2.weight(.semibold))
@@ -104,32 +171,28 @@ private struct TeamPlayerInfoCard: View {
                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 .shadow(color: Color.black.opacity(0.15), radius: 3, x: 0, y: 1)
             } else {
-                // No player selected - show position with tap to select
-                VStack(spacing: 3) {
-                    Text(position)
+                // No player selected - show position abbreviation and + (matching PlayerInfoCard style)
+                VStack(spacing: 0) {
+                    Text(positionAbbreviation)
                         .font(.caption2.weight(.semibold))
                         .foregroundColor(.black)
                         .lineLimit(1)
                         .multilineTextAlignment(.center)
-                        .frame(maxWidth: 72)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .padding(.horizontal, 6)
+                        .background(Color.white)
                     
-                    Text("Tap to select")
+                    Text("+")
                         .font(.caption2.weight(.bold))
                         .foregroundColor(.white)
-                        .padding(.vertical, 2)
-                        .padding(.horizontal, 6)
-                        .background(
-                            Capsule()
-                                .fill(Color.blue)
-                        )
                         .lineLimit(1)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .padding(.horizontal, 6)
+                        .background(Color.black)
                 }
-                .padding(.vertical, 6)
-                .padding(.horizontal, 6)
-                .background(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(Color.white)
-                )
+                .frame(height: 38)
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 .shadow(color: Color.black.opacity(0.15), radius: 3, x: 0, y: 1)
                 .onTapGesture {
                     onTap()
@@ -146,7 +209,8 @@ private struct TeamPlayerInfoCard: View {
             position: "Defender-1",
             selectedPlayer: nil,
             onTap: {},
-            onDeselect: {}
+            onDeselect: {},
+            context: .createTeam
         )
         
         // Selected player
@@ -169,7 +233,8 @@ private struct TeamPlayerInfoCard: View {
                 penSaves: 0
             ),
             onTap: {},
-            onDeselect: {}
+            onDeselect: {},
+            context: .createTeam
         )
     }
     .padding()

@@ -90,7 +90,7 @@ struct ContentView: View {
                                 )
                                 .contentShape(Rectangle())
                                 .onTapGesture {
-                                    withAnimation(.snappy) {
+                                    withAnimation(.easeInOut(duration: 0.25)) {
                                         selectedType = type
                                     }
                                 }
@@ -127,6 +127,9 @@ struct ContentView: View {
 
             } content: {
                 selectedContentView(for: selectedType)
+                    .id(selectedType)
+                    .transition(.opacity)
+                    .animation(.easeInOut(duration: 0.25), value: selectedType)
             }
         }
     }

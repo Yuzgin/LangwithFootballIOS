@@ -17,6 +17,7 @@ struct PlayerIconView: View {
     let weeklyPoints: Int?
     let showSplitInfo: Bool
     let metric: PlayerInfoMetric
+    @State private var showingPlayerDetail = false
 
     init(
         player: Player,
@@ -77,6 +78,12 @@ struct PlayerIconView: View {
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .accessibilityElement(children: .combine)
         .accessibilityLabel(player.name)
+        .onTapGesture {
+            showingPlayerDetail = true
+        }
+        .sheet(isPresented: $showingPlayerDetail) {
+            PlayerDetailModal(player: player, weeklyPoints: weeklyPoints)
+        }
     }
 }
 

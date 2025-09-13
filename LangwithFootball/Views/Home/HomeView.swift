@@ -14,6 +14,7 @@ struct HomeView: View {
     @StateObject private var matchViewModel = MatchViewModel()
     @State private var currentDate = Date()
     @State private var showingMapOptions = false
+    @State private var announcementsExpanded = false
     
     var body: some View {
         ScrollView {
@@ -77,26 +78,42 @@ struct HomeView: View {
     // MARK: - Announcements Section
     private var announcementsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            sectionHeader(title: "📢 Announcements", icon: "megaphone.fill")
+            HStack {
+                sectionHeader(title: "📢 Announcements", icon: "megaphone.fill")
+                
+                Spacer()
+                
+                Button(action: {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        announcementsExpanded.toggle()
+                    }
+                }) {
+                    Image(systemName: announcementsExpanded ? "chevron.up" : "chevron.down")
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.7))
+                        .padding(4)
+                }
+            }
+            
+            let announcements = [
+                ("Welcome to the new Langwith Football app!", "Explore fixtures, results, fantasy, and more — all in one place.", true),
+                ("Trials announced", "Trials are set for 2–4 PM on Tue 16 Sep at the 22 Acres.", true),
+                ("Training confirmed", "Training is confirmed for the dates, times, and location shown below.", false)
+            ]
             
             VStack(spacing: 8) {
-                announcementCard(
-                    title: "New Season Starting Soon!",
-                    message: "The 2025 season kicks off next week. Make sure your fantasy team is ready!",
-                    isImportant: true
-                )
-                
-                announcementCard(
-                    title: "Training Schedule Updated",
-                    message: "Tuesday and Thursday training sessions now start at 6:30 PM",
-                    isImportant: false
-                )
-                
-                announcementCard(
-                    title: "Fantasy League Registration",
-                    message: "Join the Langwith Fantasy League - prizes for top performers!",
-                    isImportant: false
-                )
+                ForEach(Array(announcements.enumerated()), id: \.offset) { index, announcement in
+                    if index == 0 || announcementsExpanded {
+                        announcementCard(
+                            title: announcement.0,
+                            message: announcement.1,
+                            isImportant: announcement.2,
+                            isCollapsed: !announcementsExpanded && index == 0
+                        )
+                        .scaleEffect(announcementsExpanded ? 1.0 : (index == 0 ? 1.0 : 0.95))
+                        .opacity(announcementsExpanded ? 1.0 : (index == 0 ? 1.0 : 0.8))
+                    }
+                }
             }
         }
     }
@@ -121,9 +138,9 @@ struct HomeView: View {
         VStack(alignment: .leading, spacing: 12) {
             sectionHeader(title: "📅 Next Fixtures", icon: "calendar.badge.clock")
             
-            if fixtureViewModel.fixtures.isEmpty {
+            if fixtureViewModel.isLoading {
                 loadingCard(message: "Loading fixtures...")
-            } else {
+            } else if fixtureViewModel.hasLoaded {
                 let nextDayFixtures = getNextDayFixtures()
                 if nextDayFixtures.isEmpty {
                     noDataCard(message: "No upcoming fixtures")
@@ -132,6 +149,8 @@ struct HomeView: View {
                         fixtureCard(fixture: fixture)
                     }
                 }
+            } else {
+                loadingCard(message: "Loading fixtures...")
             }
         }
     }
@@ -141,9 +160,9 @@ struct HomeView: View {
         VStack(alignment: .leading, spacing: 12) {
             sectionHeader(title: "🏆 Recent Results", icon: "trophy.fill")
             
-            if matchViewModel.matches.isEmpty {
+            if matchViewModel.isLoading {
                 loadingCard(message: "Loading results...")
-            } else {
+            } else if matchViewModel.hasLoaded {
                 let recentDayResults = getRecentDayResults()
                 if recentDayResults.isEmpty {
                     noDataCard(message: "No recent results")
@@ -152,6 +171,8 @@ struct HomeView: View {
                         resultCard(match: match)
                     }
                 }
+            } else {
+                loadingCard(message: "Loading results...")
             }
         }
     }
@@ -170,7 +191,7 @@ struct HomeView: View {
         }
     }
     
-    private func announcementCard(title: String, message: String, isImportant: Bool) -> some View {
+    private func announcementCard(title: String, message: String, isImportant: Bool, isCollapsed: Bool = false) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text(title)
@@ -191,134 +212,102 @@ struct HomeView: View {
                 }
             }
             
-            Text(message)
-                .font(.caption)
-                .foregroundColor(.black.opacity(0.7))
-                .multilineTextAlignment(.leading)
+            if !isCollapsed {
+                Text(message)
+                    .font(.caption)
+                    .foregroundColor(.black.opacity(0.7))
+                    .multilineTextAlignment(.leading)
+            }
         }
         .padding(12)
-        .background(Color.white.opacity(0.9))
-        .cornerRadius(8)
-        .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
+        .background(
+            LinearGradient(
+                gradient: Gradient(colors: [Color.white.opacity(0.95), Color.white.opacity(0.85)]),
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+        .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.primary.opacity(0.1), lineWidth: 1)
+        )
+        .shadow(color: .white.opacity(0.4), radius: 6, x: 0, y: -3)
+        .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 4)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 6)
+        .padding(.horizontal, 12)
     }
     
     private func trainingCard(day: String, time: String, location: String) -> some View {
         Button(action: {
             showingMapOptions = true
         }) {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
+            VStack(spacing: 8) {
+                HStack {
                     Text(day)
-                        .font(.subheadline)
+                        .font(.headline)
                         .fontWeight(.semibold)
-                        .foregroundColor(.black.opacity(0.9))
+                        .foregroundColor(.primary)
                     
-                    Text(time)
-                        .font(.caption)
-                        .foregroundColor(.black.opacity(0.7))
+                    Spacer()
                     
-                    Text(location)
-                        .font(.caption)
-                        .foregroundColor(.black.opacity(0.6))
+                    Image(systemName: "sportscourt")
+                        .foregroundColor(.orange)
+                        .font(.title2)
+                        .frame(width: 22, height: 22)
                 }
                 
-                Spacer()
+                HStack {
+                    Image(systemName: "clock")
+                        .foregroundColor(.orange)
+                        .font(.caption)
+                    Text(time)
+                        .font(.subheadline)
+                        .foregroundColor(.white.opacity(0.9))
+                        .scaleEffect(0.9)
+                    Spacer()
+                }
                 
-                Image(systemName: "sportscourt")
-                    .foregroundColor(.orange)
-                    .font(.title2)
+                HStack {
+                    Image(systemName: "location")
+                        .foregroundColor(.orange)
+                        .font(.caption)
+                    Text(location)
+                        .font(.subheadline)
+                        .foregroundColor(.white.opacity(0.9))
+                        .scaleEffect(0.9)
+                    Spacer()
+                }
             }
-            .padding(12)
-            .background(Color.white.opacity(0.9))
-            .cornerRadius(8)
-            .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
+            .padding(.vertical, 12)
+            .padding(.horizontal, 16)
+            .background(
+                LinearGradient(
+                    gradient: Gradient(colors: [Color(.systemGray6), Color(.systemGray5)]),
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+            )
+            .shadow(color: .white.opacity(0.3), radius: 8, x: 0, y: -2)
+            .shadow(color: .black.opacity(0.08), radius: 4, x: 0, y: 2)
+            .padding(.vertical, 6)
+            .padding(.horizontal, 12)
         }
         .buttonStyle(PlainButtonStyle())
     }
     
     private func fixtureCard(fixture: Fixture) -> some View {
-        VStack(spacing: 8) {
-            HStack {
-                Text(formatDate(fixture.date))
-                    .font(.caption)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.orange)
-                
-                Spacer()
-                
-                Text(formatTime(fixture.time))
-                    .font(.caption)
-                    .foregroundColor(.black.opacity(0.7))
-            }
-            
-            HStack {
-                Text(fixture.team1)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .foregroundColor(.black.opacity(0.9))
-                
-                Text("vs")
-                    .font(.caption)
-                    .foregroundColor(.black.opacity(0.6))
-                
-                Text(fixture.team2)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .foregroundColor(.black.opacity(0.9))
-            }
-            
-            HStack {
-                Image(systemName: "location")
-                    .foregroundColor(.orange)
-                    .font(.caption)
-                Text(fixture.location)
-                    .font(.caption)
-                    .foregroundColor(.black.opacity(0.7))
-                Spacer()
-            }
-        }
-        .padding(12)
-        .background(Color.white.opacity(0.9))
-        .cornerRadius(8)
-        .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
+        FixtureCard(fixture: fixture)
     }
     
     private func resultCard(match: Match) -> some View {
-        VStack(spacing: 8) {
-            HStack {
-                Text(formatDate(match.date))
-                    .font(.caption)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.green)
-                
-                Spacer()
-            }
-            
-            HStack {
-                Text(match.team1)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .foregroundColor(.black.opacity(0.9))
-                
-                Spacer()
-                
-                Text("\(match.team1Score) - \(match.team2Score)")
-                    .font(.subheadline)
-                    .fontWeight(.bold)
-                    .foregroundColor(.black.opacity(0.9))
-                
-                Spacer()
-                
-                Text(match.team2)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .foregroundColor(.black.opacity(0.9))
-            }
-        }
-        .padding(12)
-        .background(Color.white.opacity(0.9))
-        .cornerRadius(8)
-        .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
+        ResultCard(match: match)
     }
     
     private func loadingCard(message: String) -> some View {
@@ -391,17 +380,6 @@ struct HomeView: View {
         return []
     }
     
-    private func formatDate(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "EEEE, MMM d"
-        return formatter.string(from: date)
-    }
-    
-    private func formatTime(_ time: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm"
-        return formatter.string(from: time)
-    }
     
     private func openInAppleMaps() {
         let coordinate = CLLocationCoordinate2D(latitude: 53.951702, longitude: -1.016212)

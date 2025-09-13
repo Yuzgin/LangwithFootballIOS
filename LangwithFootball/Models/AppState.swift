@@ -13,5 +13,18 @@ final class AppState: ObservableObject {
 
     init() {
         self.isLoggedIn = AuthService.shared.isLoggedIn()
+        
+        // Listen for logout notifications
+        NotificationCenter.default.addObserver(
+            forName: .userLoggedOut,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.isLoggedIn = false
+        }
+    }
+    
+    deinit {
+        NotificationCenter.default.removeObserver(self)
     }
 }

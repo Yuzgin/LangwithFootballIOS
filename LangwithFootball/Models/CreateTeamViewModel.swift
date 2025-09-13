@@ -18,6 +18,7 @@ final class CreateTeamViewModel: ObservableObject {
     @Published var isLoading: Bool = true
     @Published var errorMessage: String?
     @Published var hasTeam: Bool = false
+    @Published var isCheckingTeam: Bool = true
     
     private var cancellables = Set<AnyCancellable>()
     
@@ -56,19 +57,22 @@ final class CreateTeamViewModel: ObservableObject {
     }
     
     func checkIfUserHasTeam() {
+        // Reset checking flag whenever we perform the check
+        isCheckingTeam = true
+
         APIService.shared.fetchTeam()
             .receive(on: DispatchQueue.main)
             .sink(receiveCompletion: { [weak self] completion in
                 guard let self = self else { return }
-                if case .failure(let error) = completion {
-                    // If 404, user doesn't have a team
-                    if let urlError = error as? URLError, urlError.code == .badServerResponse {
-                        self.hasTeam = false
-                    }
+                if case .failure(_) = completion {
+                    // On any failure assume user doesn't have a team
+                    self.hasTeam = false
+                    self.isCheckingTeam = false
                 }
             }, receiveValue: { [weak self] team in
                 guard let self = self else { return }
                 self.hasTeam = true
+                self.isCheckingTeam = false
             })
             .store(in: &cancellables)
     }

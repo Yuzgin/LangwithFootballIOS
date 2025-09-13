@@ -26,8 +26,7 @@ struct SettingsView: View {
                         .foregroundColor(.secondary)
                     
                     Button("Logout") {
-                        UserDefaults.standard.removeObject(forKey: "accessToken")
-                        UserDefaults.standard.removeObject(forKey: "refreshToken")
+                        AuthService.shared.logout()
                         appState.isLoggedIn = false
                     }
                     .foregroundColor(.white)

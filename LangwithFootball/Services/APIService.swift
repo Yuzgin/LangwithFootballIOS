@@ -67,6 +67,12 @@ class APIService {
                         .flatMap { _ in
                             self.performAuthorizedRequest(path: path, method: method, retry: false)
                         }
+                        .catch { refreshError -> AnyPublisher<Data, Error> in
+                            // If refresh fails, logout user and return error
+                            print("❌ Token refresh failed: \(refreshError)")
+                            AuthService.shared.logout()
+                            return Fail(error: refreshError).eraseToAnyPublisher()
+                        }
                         .eraseToAnyPublisher()
                 } else {
                     return Fail(error: error).eraseToAnyPublisher()
@@ -249,6 +255,17 @@ class APIService {
             }())
             .eraseToAnyPublisher()
     }
+
+    /// Update existing team (players and formation)
+    func updateTeam(teamData: UpdateTeamRequest) -> AnyPublisher<Team, Error> {
+        return performAuthorizedRequestWithBody(path: "/api/team/", method: "PUT", body: teamData)
+            .decode(type: Team.self, decoder: {
+                let decoder = JSONDecoder()
+                decoder.dateDecodingStrategy = .iso8601
+                return decoder
+            }())
+            .eraseToAnyPublisher()
+    }
     
     /// Perform an authenticated request with JSON body, attempting token refresh on 401 responses
     private func performAuthorizedRequestWithBody<T: Codable>(path: String, method: String, body: T) -> AnyPublisher<Data, Error> {
@@ -283,6 +300,12 @@ class APIService {
                     return AuthService.shared.refreshTokensPublisher()
                         .flatMap { _ in
                             self.performAuthorizedRequestWithBody(path: path, method: method, body: body)
+                        }
+                        .catch { refreshError -> AnyPublisher<Data, Error> in
+                            // If refresh fails, logout user and return error
+                            print("❌ Token refresh failed: \(refreshError)")
+                            AuthService.shared.logout()
+                            return Fail(error: refreshError).eraseToAnyPublisher()
                         }
                         .eraseToAnyPublisher()
                 } else {

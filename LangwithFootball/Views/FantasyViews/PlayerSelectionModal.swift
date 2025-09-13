@@ -42,8 +42,48 @@ struct PlayerSelectionModal: View {
                 }
                 .padding()
                 
+                // Table header
+                HStack(spacing: 0) {
+                    Text("Name")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 10)
+                    
+                    Text("Price")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(width: 60, alignment: .center)
+                        .padding(.vertical, 10)
+                    
+                    Text("Pts")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(width: 50, alignment: .center)
+                        .padding(.vertical, 10)
+                    
+                    Text("G")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(width: 40, alignment: .center)
+                        .padding(.vertical, 10)
+                    
+                    Text("A")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(width: 40, alignment: .center)
+                        .padding(.vertical, 10)
+                    
+                    Text("CS")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(width: 40, alignment: .center)
+                        .padding(.vertical, 10)
+                }
+                .background(Color.gray.opacity(0.1))
+                .overlay(
+                    Rectangle()
+                        .frame(height: 1)
+                        .foregroundColor(Color.gray.opacity(0.3)),
+                    alignment: .bottom
+                )
                 
-                // Players list
+                // Players table
                 if filteredPlayers.isEmpty {
                     VStack(spacing: 16) {
                         Image(systemName: "person.slash")
@@ -60,16 +100,24 @@ struct PlayerSelectionModal: View {
                     .padding()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
-                    List(filteredPlayers) { player in
-                        PlayerSelectionRow(
-                            player: player,
-                            isSelected: isPlayerSelected(player.id),
-                            onSelect: {
-                                onPlayerSelect(player.id)
+                    ScrollView {
+                        LazyVStack(spacing: 0) {
+                            ForEach(filteredPlayers) { player in
+                                PlayerSelectionRow(
+                                    player: player,
+                                    isSelected: isPlayerSelected(player.id),
+                                    onSelect: {
+                                        onPlayerSelect(player.id)
+                                    }
+                                )
+                                
+                                if player.id != filteredPlayers.last?.id {
+                                    Divider()
+                                        .background(Color.gray.opacity(0.2))
+                                }
                             }
-                        )
+                        }
                     }
-                    .listStyle(PlainListStyle())
                 }
             }
             .navigationTitle("Select \(position)")
@@ -91,66 +139,69 @@ private struct PlayerSelectionRow: View {
     let onSelect: () -> Void
     
     var body: some View {
-        HStack(spacing: 12) {
-            // Player icon
-            Image(player.position == "Goalkeeper" ? "PlayerIconGK" : "PlayerIcon")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 40, height: 40)
-                .clipShape(Circle())
-            
-            // Player info
-            VStack(alignment: .leading, spacing: 4) {
+        HStack(spacing: 0) {
+            // Name column
+            VStack(alignment: .leading, spacing: 2) {
                 Text(player.name)
-                    .font(.headline)
+                    .font(.subheadline.weight(.medium))
                     .foregroundColor(.primary)
+                    .lineLimit(1)
                 
-                HStack(spacing: 8) {
-                    Text(player.position)
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                    
-                    if let team = player.team {
-                        Text("• \(team)")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                    }
-                }
-                
-                HStack(spacing: 12) {
-                    if let price = player.price {
-                        Text("£\(String(format: "%.1f", price))m")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundColor(.blue)
-                    }
-                    
-                    Text("\(player.points) pts")
-                        .font(.subheadline)
-                        .foregroundColor(.green)
-                }
+                Text(player.position)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
             
-            Spacer()
-            
-            // Selection indicator
-            if isSelected {
-                Image(systemName: "checkmark.circle.fill")
+            // Price column
+            if let price = player.price {
+                Text("£\(String(format: "%.1f", price))")
+                    .font(.subheadline.weight(.medium))
                     .foregroundColor(.blue)
-                    .font(.title2)
+                    .frame(width: 60, alignment: .center)
+                    .padding(.vertical, 10)
             } else {
-                Button("Select") {
-                    onSelect()
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.small)
+                Text("-")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .frame(width: 60, alignment: .center)
+                    .padding(.vertical, 10)
             }
+            
+            // Points column
+            Text("\(player.points)")
+                .font(.subheadline.weight(.medium))
+                .foregroundColor(.white)
+                .frame(width: 50, alignment: .center)
+                .padding(.vertical, 10)
+            
+            // Goals column
+            Text("\(player.goals)")
+                .font(.subheadline.weight(.medium))
+                .foregroundColor(.primary)
+                .frame(width: 40, alignment: .center)
+                .padding(.vertical, 10)
+            
+            // Assists column
+            Text("\(player.assists)")
+                .font(.subheadline.weight(.medium))
+                .foregroundColor(.primary)
+                .frame(width: 40, alignment: .center)
+                .padding(.vertical, 10)
+            
+            // Clean Sheets column
+            Text("\(player.cleanSheets)")
+                .font(.subheadline.weight(.medium))
+                .foregroundColor(.primary)
+                .frame(width: 40, alignment: .center)
+                .padding(.vertical, 10)
         }
-        .padding(.vertical, 8)
+        .background(isSelected ? Color.green.opacity(0.1) : Color.clear)
         .contentShape(Rectangle())
         .onTapGesture {
-            if !isSelected {
-                onSelect()
-            }
+            onSelect()
         }
     }
 }
