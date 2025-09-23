@@ -7,10 +7,6 @@
 
 import SwiftUI
 
-extension String: Identifiable {
-    public var id: String { self }
-}
-
 struct CreateTeamView: View {
     @EnvironmentObject var viewModel: CreateTeamViewModel
     @State private var selectedPosition: String? = nil
@@ -32,6 +28,20 @@ struct CreateTeamView: View {
                     }
                 )
             
+            // Captain instruction when only captain selection remains
+            if viewModel.needsCaptainSelection {
+                VStack(spacing: 4) {
+                    Text("Select a captain to finish your team.")
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                    Text("Tip: click on a player to select captain")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 4)
+            }
+
                 // Controls
                 CreateTeamControls(
                     canCreateTeam: viewModel.canCreateTeam(),
@@ -46,19 +56,24 @@ struct CreateTeamView: View {
                 SelectedPlayersSummary(viewModel: viewModel)
             }
         }
-        .sheet(item: $selectedPosition) { position in
-            PlayerSelectionModal(
-                players: viewModel.players,
-                position: position,
-                isPlayerSelected: viewModel.isPlayerSelected,
-                onPlayerSelect: { playerId in
-                    viewModel.selectPlayer(playerId: playerId, for: position)
-                    selectedPosition = nil
-                },
-                onDismiss: {
-                    selectedPosition = nil
-                }
-            )
+        .sheet(isPresented: Binding<Bool>(
+            get: { selectedPosition != nil },
+            set: { if !$0 { selectedPosition = nil } }
+        )) {
+            if let position = selectedPosition {
+                PlayerSelectionModal(
+                    players: viewModel.players,
+                    position: position,
+                    isPlayerSelected: viewModel.isPlayerSelected,
+                    onPlayerSelect: { playerId in
+                        viewModel.selectPlayer(playerId: playerId, for: position)
+                        selectedPosition = nil
+                    },
+                    onDismiss: {
+                        selectedPosition = nil
+                    }
+                )
+            }
         }
         .overlay {
             if viewModel.isLoading {
@@ -167,8 +182,8 @@ private struct CreateTeamFormationView: View {
                 
                 LazyVStack(spacing: 25, pinnedViews: []) {
                     // Attackers (top)
-                    LazyHStack(spacing: 14) {
-                        ForEach(viewModel.formationPositions.filter { $0.hasPrefix("Attacker") }, id: \.self) { position in
+                    LazyHStack(spacing: attackerSpacing) {
+                        ForEach(Array(viewModel.formationPositions.filter { $0.hasPrefix("Attacker") }.enumerated()), id: \.offset) { index, position in
                             // Only render base slot if team is incomplete or this exact slot is already assigned
                             if viewModel.getSelectedPlayerCount() < 10 || viewModel.getPlayerForPosition(position) != nil {
                                 // Skip Attacker-2 if only one attacker is allowed
@@ -180,7 +195,13 @@ private struct CreateTeamFormationView: View {
                                         selectedPlayer: viewModel.getPlayerForPosition(position),
                                         onTap: { onPlayerTap(position) },
                                         onDeselect: { viewModel.deselectPlayer(at: position) },
-                                        context: .createTeam
+                                        context: .createTeam,
+                                        isCaptain: viewModel.captainId != nil && viewModel.captainId == viewModel.getPlayerForPosition(position)?.id,
+                                        onMakeCaptain: {
+                                            if let id = viewModel.getPlayerForPosition(position)?.id {
+                                                viewModel.setCaptain(playerId: id)
+                                            }
+                                        }
                                     )
                                 }
                             }
@@ -193,21 +214,33 @@ private struct CreateTeamFormationView: View {
                                 selectedPlayer: viewModel.getPlayerForPosition("Attacker-3"),
                                 onTap: { onPlayerTap("Attacker-3") },
                                 onDeselect: { viewModel.deselectPlayer(at: "Attacker-3") },
-                                context: .createTeam
+                                context: .createTeam,
+                                isCaptain: viewModel.captainId != nil && viewModel.captainId == viewModel.getPlayerForPosition("Attacker-3")?.id,
+                                onMakeCaptain: {
+                                    if let id = viewModel.getPlayerForPosition("Attacker-3")?.id {
+                                        viewModel.setCaptain(playerId: id)
+                                    }
+                                }
                             )
                         }
                     }
                     
                     // Midfielders
-                    LazyHStack(spacing: 10) {
-                        ForEach(viewModel.formationPositions.filter { $0.hasPrefix("Midfielder") }, id: \.self) { position in
+                    LazyHStack(spacing: midfielderSpacing) {
+                        ForEach(Array(viewModel.formationPositions.filter { $0.hasPrefix("Midfielder") }.enumerated()), id: \.offset) { index, position in
                             if viewModel.getSelectedPlayerCount() < 10 || viewModel.getPlayerForPosition(position) != nil {
                             TeamPlayerIconView(
                                 position: position,
                                 selectedPlayer: viewModel.getPlayerForPosition(position),
                                 onTap: { onPlayerTap(position) },
                                 onDeselect: { viewModel.deselectPlayer(at: position) },
-                                context: .createTeam
+                                context: .createTeam,
+                                isCaptain: viewModel.captainId != nil && viewModel.captainId == viewModel.getPlayerForPosition(position)?.id,
+                                onMakeCaptain: {
+                                    if let id = viewModel.getPlayerForPosition(position)?.id {
+                                        viewModel.setCaptain(playerId: id)
+                                    }
+                                }
                             )
                             }
                         }
@@ -219,21 +252,33 @@ private struct CreateTeamFormationView: View {
                                 selectedPlayer: viewModel.getPlayerForPosition("Midfielder-5"),
                                 onTap: { onPlayerTap("Midfielder-5") },
                                 onDeselect: { viewModel.deselectPlayer(at: "Midfielder-5") },
-                                context: .createTeam
+                                context: .createTeam,
+                                isCaptain: viewModel.captainId != nil && viewModel.captainId == viewModel.getPlayerForPosition("Midfielder-5")?.id,
+                                onMakeCaptain: {
+                                    if let id = viewModel.getPlayerForPosition("Midfielder-5")?.id {
+                                        viewModel.setCaptain(playerId: id)
+                                    }
+                                }
                             )
                         }
                     }
                     
                     // Defenders
-                    LazyHStack(spacing: 10) {
-                        ForEach(viewModel.formationPositions.filter { $0.hasPrefix("Defender") }, id: \.self) { position in
+                    LazyHStack(spacing: defenderSpacing) {
+                        ForEach(Array(viewModel.formationPositions.filter { $0.hasPrefix("Defender") }.enumerated()), id: \.offset) { index, position in
                             if viewModel.getSelectedPlayerCount() < 10 || viewModel.getPlayerForPosition(position) != nil {
                             TeamPlayerIconView(
                                 position: position,
                                 selectedPlayer: viewModel.getPlayerForPosition(position),
                                 onTap: { onPlayerTap(position) },
                                 onDeselect: { viewModel.deselectPlayer(at: position) },
-                                context: .createTeam
+                                context: .createTeam,
+                                isCaptain: viewModel.captainId != nil && viewModel.captainId == viewModel.getPlayerForPosition(position)?.id,
+                                onMakeCaptain: {
+                                    if let id = viewModel.getPlayerForPosition(position)?.id {
+                                        viewModel.setCaptain(playerId: id)
+                                    }
+                                }
                             )
                             }
                         }
@@ -245,7 +290,13 @@ private struct CreateTeamFormationView: View {
                                 selectedPlayer: viewModel.getPlayerForPosition("Defender-5"),
                                 onTap: { onPlayerTap("Defender-5") },
                                 onDeselect: { viewModel.deselectPlayer(at: "Defender-5") },
-                                context: .createTeam
+                                context: .createTeam,
+                                isCaptain: viewModel.captainId != nil && viewModel.captainId == viewModel.getPlayerForPosition("Defender-5")?.id,
+                                onMakeCaptain: {
+                                    if let id = viewModel.getPlayerForPosition("Defender-5")?.id {
+                                        viewModel.setCaptain(playerId: id)
+                                    }
+                                }
                             )
                         }
                     }
@@ -257,7 +308,13 @@ private struct CreateTeamFormationView: View {
                             selectedPlayer: viewModel.getPlayerForPosition("Goalkeeper"),
                             onTap: { onPlayerTap("Goalkeeper") },
                             onDeselect: { viewModel.deselectPlayer(at: "Goalkeeper") },
-                            context: .createTeam
+                            context: .createTeam,
+                            isCaptain: viewModel.captainId != nil && viewModel.captainId == viewModel.getPlayerForPosition("Goalkeeper")?.id,
+                            onMakeCaptain: {
+                                if let id = viewModel.getPlayerForPosition("Goalkeeper")?.id {
+                                    viewModel.setCaptain(playerId: id)
+                                }
+                            }
                         )
                     }
                 }
@@ -268,6 +325,26 @@ private struct CreateTeamFormationView: View {
         }
         .scrollIndicators(.hidden)
         .background(Color.black.opacity(0.05))
+    }
+    
+    // MARK: - Dynamic Spacing Calculations
+    
+    private var attackerSpacing: CGFloat {
+        let baseAttackers = viewModel.formationPositions.filter { $0.hasPrefix("Attacker") }.count
+        let additionalAttackers = (viewModel.additionalAttackerAllowed || viewModel.selectedPlayers["Attacker-3"] != nil) ? 1 : 0
+        return FormationSpacingUtility.spacingForPositionGroup(baseCount: baseAttackers, additionalCount: additionalAttackers)
+    }
+    
+    private var midfielderSpacing: CGFloat {
+        let baseMidfielders = viewModel.formationPositions.filter { $0.hasPrefix("Midfielder") }.count
+        let additionalMidfielders = (viewModel.additionalMidfielderAllowed || viewModel.selectedPlayers["Midfielder-5"] != nil) ? 1 : 0
+        return FormationSpacingUtility.spacingForPositionGroup(baseCount: baseMidfielders, additionalCount: additionalMidfielders)
+    }
+    
+    private var defenderSpacing: CGFloat {
+        let baseDefenders = viewModel.formationPositions.filter { $0.hasPrefix("Defender") }.count
+        let additionalDefenders = (viewModel.additionalDefenderAllowed || viewModel.selectedPlayers["Defender-5"] != nil) ? 1 : 0
+        return FormationSpacingUtility.spacingForPositionGroup(baseCount: baseDefenders, additionalCount: additionalDefenders)
     }
 }
 
@@ -353,7 +430,7 @@ private struct SelectedPlayersSummary: View {
                 GridItem(.flexible()),
                 GridItem(.flexible())
             ], spacing: 8) {
-                ForEach(Array(viewModel.selectedPlayers.keys.sorted()), id: \.self) { position in
+                ForEach(Array(viewModel.selectedPlayers.keys.sorted().enumerated()), id: \.offset) { index, position in
                     if let player = viewModel.getPlayerForPosition(position) {
                         HStack {
                             Text(player.name)

@@ -20,13 +20,16 @@ private var startOfToday: Date {
 }
 
 private func mergedDateTime(_ date: Date, _ time: Date) -> Date {
-    let cal = Calendar.current
-    let d = cal.dateComponents([.year, .month, .day], from: date)
-    let t = cal.dateComponents([.hour, .minute, .second], from: time)
+    // Backend supplies separate date and time in UTC; combine them as UTC, then use as absolute Date
+    var utcCal = Calendar(identifier: .gregorian)
+    utcCal.timeZone = TimeZone(secondsFromGMT: 0)!
+    let d = utcCal.dateComponents([.year, .month, .day], from: date)
+    let t = utcCal.dateComponents([.hour, .minute, .second], from: time)
     var comps = DateComponents()
+    comps.timeZone = TimeZone(secondsFromGMT: 0)
     comps.year = d.year; comps.month = d.month; comps.day = d.day
     comps.hour = t.hour; comps.minute = t.minute; comps.second = t.second
-    return cal.date(from: comps) ?? date
+    return utcCal.date(from: comps) ?? date
 }
 
 private func isLangwith(_ name: String) -> Bool {
@@ -39,8 +42,12 @@ private func isLangwith(_ name: String) -> Bool {
 struct FixturesView: View {
     @StateObject private var viewModel = FixtureViewModel()
     @State private var selectedTeam: LangwithTeam? = nil
+    @State private var visibleCount: Int = 6
+    @State private var processedFixtures: [DisplayFixture] = []
 
-    private var displayedFixtures: [DisplayFixture] {
+    private var displayedFixtures: [DisplayFixture] { processedFixtures }
+
+    private func recomputeFixtures() {
         // 1) Keep only fixtures from today onwards
         let future = viewModel.fixtures.filter { mergedDateTime($0.date, $0.time) >= startOfToday }
 
@@ -72,9 +79,12 @@ struct FixturesView: View {
         }
 
         // 4) Sort chronologically
-        return leftFiltered.sorted {
+        let sorted = leftFiltered.sorted {
             mergedDateTime($0.fixture.date, $0.fixture.time) < mergedDateTime($1.fixture.date, $1.fixture.time)
         }
+
+        processedFixtures = sorted
+        visibleCount = min(6, sorted.count)
     }
 
     var body: some View {
@@ -161,37 +171,69 @@ struct FixturesView: View {
                 .padding(.top, 20)
             } else {
                 // Fixtures content
-                VStack(spacing: 0) {
-                    ForEach(displayedFixtures) { df in
-                        FixtureCard(fixture: df.fixture)
+                let fixtures = displayedFixtures
+                let limited = Array(fixtures.prefix(visibleCount))
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(limited) { df in
+                            FixtureCard(fixture: df.fixture)
+                        }
+                        if fixtures.count > visibleCount {
+                            Button(action: {
+                                visibleCount = min(visibleCount + 6, fixtures.count)
+                            }) {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "plus.circle.fill")
+                                    Text("View more")
+                                }
+                                .font(.subheadline)
+                                .padding(.vertical, 12)
+                                .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(Color.accentColor)
+                            .padding(.horizontal, 16)
+                            .padding(.top, 12)
+                            .padding(.bottom, 24)
+                        }
                     }
+                    .padding(.top, 8)
                 }
-                .padding(.top, 8)
             }
         }
         .onAppear { viewModel.fetchFixtures() }
+        .onChange(of: selectedTeam) {
+            recomputeFixtures()
+        }
+        .onChange(of: viewModel.fixtures) {
+            recomputeFixtures()
+        }
     }
 
     // MARK: - Date formatting helpers
 
     private func formattedDateTime(date: Date, time: Date) -> String {
-        // If your backend already gives combined Date, use that directly.
-        // Otherwise, merge date & time components for display only:
-        let cal = Calendar.current
-        let dateComps = cal.dateComponents([.year, .month, .day], from: date)
-        let timeComps = cal.dateComponents([.hour, .minute, .second], from: time)
+        // Combine as UTC, then present in user's local timezone (BST when applicable)
+        var utcCal = Calendar(identifier: .gregorian)
+        utcCal.timeZone = TimeZone(secondsFromGMT: 0)!
+        let d = utcCal.dateComponents([.year, .month, .day], from: date)
+        let t = utcCal.dateComponents([.hour, .minute, .second], from: time)
         var merged = Date()
-        if let y = dateComps.year, let m = dateComps.month, let d = dateComps.day,
-           let h = timeComps.hour, let min = timeComps.minute, let s = timeComps.second {
+        if let y = d.year, let m = d.month, let day = d.day,
+           let h = t.hour, let min = t.minute, let s = t.second {
             var comps = DateComponents()
-            comps.year = y; comps.month = m; comps.day = d
+            comps.timeZone = TimeZone(secondsFromGMT: 0)
+            comps.year = y; comps.month = m; comps.day = day
             comps.hour = h; comps.minute = min; comps.second = s
-            merged = cal.date(from: comps) ?? date
+            merged = utcCal.date(from: comps) ?? date
         } else {
             merged = date
         }
         let formatter = DateFormatter()
-        formatter.dateFormat = "d MMMM yyyy, h:mm a"
+        formatter.locale = .current
+        formatter.timeZone = .current
+        // Example: Wed 1 Oct, 3:30 PM
+        formatter.dateFormat = "EEE d MMM, h:mm a"
         return formatter.string(from: merged)
     }
 }

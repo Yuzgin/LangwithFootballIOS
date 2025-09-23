@@ -17,24 +17,36 @@ struct PlayerIconView: View {
     let weeklyPoints: Int?
     let showSplitInfo: Bool
     let metric: PlayerInfoMetric
+    let captain: Player?
     @State private var showingPlayerDetail = false
 
     init(
         player: Player,
         weeklyPoints: Int? = nil,
         showSplitInfo: Bool = true,
-        metric: PlayerInfoMetric = .points
+        metric: PlayerInfoMetric = .points,
+        captain: Player? = nil
     ) {
         self.player = player
         self.weeklyPoints = weeklyPoints
         self.showSplitInfo = showSplitInfo
         self.metric = metric
+        self.captain = captain
     }
 
+    private var isCaptain: Bool {
+        captain?.id == player.id
+    }
+    
+    private var displayPoints: Int? {
+        guard let points = weeklyPoints else { return nil }
+        return isCaptain ? points * 2 : points
+    }
+    
     private var splitBottomText: String? {
         switch metric {
         case .points:
-            return weeklyPoints.map { "\($0) pts" }
+            return displayPoints.map { "\($0) pts" }
         case .price:
             if let price = player.price {
                 let formatted = String(format: "£%.1f", price)
@@ -73,6 +85,28 @@ struct PlayerIconView: View {
             .frame(width: 63)
             .padding(.bottom, 1)
             .offset(y: 0)
+            
+            // Captain indicator
+            if isCaptain {
+                VStack {
+                    HStack {
+                        ZStack {
+                            Circle()
+                                .fill(Color.black)
+                                .frame(width: 20, height: 20)
+                            
+                            Text("C")
+                                .font(.caption2.weight(.bold))
+                                .foregroundColor(.white)
+                        }
+                        .padding(.top, 2)
+                        .padding(.leading, 2)
+                        
+                        Spacer()
+                    }
+                    Spacer()
+                }
+            }
         }
         .frame(width: 65, height: 90)
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))

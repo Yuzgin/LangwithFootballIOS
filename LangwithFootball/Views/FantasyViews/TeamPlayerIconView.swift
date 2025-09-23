@@ -19,6 +19,8 @@ struct TeamPlayerIconView: View {
     let onTap: () -> Void
     let onDeselect: () -> Void
     let context: TeamPlayerIconContext
+    let isCaptain: Bool
+    let onMakeCaptain: (() -> Void)?
     @State private var showingPlayerDetail = false
     @State private var showingTransferAction = false
     
@@ -27,13 +29,17 @@ struct TeamPlayerIconView: View {
         selectedPlayer: Player?,
         onTap: @escaping () -> Void,
         onDeselect: @escaping () -> Void,
-        context: TeamPlayerIconContext = .createTeam
+        context: TeamPlayerIconContext = .createTeam,
+        isCaptain: Bool = false,
+        onMakeCaptain: (() -> Void)? = nil
     ) {
         self.position = position
         self.selectedPlayer = selectedPlayer
         self.onTap = onTap
         self.onDeselect = onDeselect
         self.context = context
+        self.isCaptain = isCaptain
+        self.onMakeCaptain = onMakeCaptain
     }
     
     var body: some View {
@@ -78,17 +84,37 @@ struct TeamPlayerIconView: View {
             .frame(width: 63)
             .padding(.bottom, 1)
             .offset(y: 0)
+
+            // Captain badge (top-left)
+            if isCaptain {
+                VStack {
+                    HStack {
+                        ZStack {
+                            Circle()
+                                .fill(Color.black)
+                                .frame(width: 18, height: 18)
+                            Text("C")
+                                .font(.caption2.weight(.bold))
+                                .foregroundColor(.white)
+                        }
+                        .padding(.top, 2)
+                        .padding(.leading, 2)
+                        Spacer()
+                    }
+                    Spacer()
+                }
+            }
         }
         .frame(width: 65, height: 90)
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .accessibilityElement(children: .combine)
         .accessibilityLabel(selectedPlayer?.name ?? "\(position) position")
         .onTapGesture {
-            if let player = selectedPlayer {
+            if selectedPlayer != nil {
                 switch context {
-                case .transfer:
+                case .transfer, .createTeam:
                     showingTransferAction = true
-                case .createTeam, .fantasy:
+                case .fantasy:
                     showingPlayerDetail = true
                 }
             } else {
@@ -110,7 +136,8 @@ struct TeamPlayerIconView: View {
                     },
                     onSelectReplacement: {
                         onTap()
-                    }
+                    },
+                    onMakeCaptain: onMakeCaptain
                 )
             }
         }
@@ -210,7 +237,8 @@ private struct TeamPlayerInfoCard: View {
             selectedPlayer: nil,
             onTap: {},
             onDeselect: {},
-            context: .createTeam
+            context: .createTeam,
+            isCaptain: false
         )
         
         // Selected player
@@ -234,7 +262,8 @@ private struct TeamPlayerInfoCard: View {
             ),
             onTap: {},
             onDeselect: {},
-            context: .createTeam
+            context: .createTeam,
+            isCaptain: true
         )
     }
     .padding()

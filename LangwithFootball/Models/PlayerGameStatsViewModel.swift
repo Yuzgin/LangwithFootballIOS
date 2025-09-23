@@ -21,12 +21,10 @@ final class PlayerGameStatsViewModel: ObservableObject {
                 guard let self = self else { return }
                 if case .failure(let error) = completion {
                     self.errorMessage = "Failed to load player game stats: \(error.localizedDescription)"
-                    print("❌ Decoding or network error:", error)
                 }
             }, receiveValue: { [weak self] stats in
                 guard let self = self else { return }
                 self.stats = stats
-                print("✅ Loaded player game stats:", stats)
             })
             .store(in: &cancellables)
     }

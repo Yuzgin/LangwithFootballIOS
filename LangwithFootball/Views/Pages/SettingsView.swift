@@ -10,6 +10,7 @@ import SwiftUI
 struct SettingsView: View {
     @EnvironmentObject var appState: AppState
     @State private var showingLoginView = false
+    @State private var showLogoutConfirm = false
     
     var body: some View {
         VStack(spacing: 20) {
@@ -26,8 +27,7 @@ struct SettingsView: View {
                         .foregroundColor(.secondary)
                     
                     Button("Logout") {
-                        AuthService.shared.logout()
-                        appState.isLoggedIn = false
+                        showLogoutConfirm = true
                     }
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
@@ -65,11 +65,20 @@ struct SettingsView: View {
         .sheet(isPresented: $showingLoginView) {
             LoginView()
         }
-        .onChange(of: appState.isLoggedIn) { isLoggedIn in
+        .onChange(of: appState.isLoggedIn) { _, isLoggedIn in
             // Dismiss the login sheet when user successfully logs in
             if isLoggedIn {
                 showingLoginView = false
             }
+        }
+        .alert("Are you sure you want to logout?", isPresented: $showLogoutConfirm) {
+            Button("Logout", role: .destructive) {
+                AuthService.shared.logout()
+                appState.isLoggedIn = false
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("You will need to log in again.")
         }
     }
 }

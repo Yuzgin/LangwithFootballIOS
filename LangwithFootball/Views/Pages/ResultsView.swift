@@ -9,18 +9,53 @@ import SwiftUI
 import Foundation
 import UIKit   // for UIImage(named:) asset existence check
 
-
-
-
+private struct DisplayMatch: Identifiable {
+    let id: String
+    let left: String
+    let right: String
+    let match: Match
+    let isSwapped: Bool
+}
 // MARK: - Results View
 
 struct ResultsView: View {
     @StateObject private var viewModel = MatchViewModel()
     @State private var selectedTeam: LangwithTeam? = nil
+    @State private var visibleCount: Int = 6
+    @State private var processedMatches: [DisplayMatch] = []
 
-    private var filteredMatches: [Match] {
-        guard let team = selectedTeam?.rawValue else { return viewModel.matches }
-        return viewModel.matches.filter { $0.team1 == team }
+    private var displayedMatches: [DisplayMatch] { processedMatches }
+
+    private func recomputeMatches() {
+        // Normalize sides to keep Langwith (if any) on the left
+        let expanded: [DisplayMatch] = viewModel.matches.flatMap { m in
+            let aIs = baseTeamName(from: m.team1) == "Langwith"
+            let bIs = baseTeamName(from: m.team2) == "Langwith"
+
+            if aIs && bIs {
+                return [
+                    DisplayMatch(id: "\(m.id)-A", left: m.team1, right: m.team2, match: m, isSwapped: false),
+                    DisplayMatch(id: "\(m.id)-B", left: m.team2, right: m.team1, match: m, isSwapped: true)
+                ]
+            } else {
+                let sides = normalizeSides(team1: m.team1, team2: m.team2)
+                let swapped = (sides.left != m.team1)
+                return [
+                    DisplayMatch(id: "\(m.id)", left: sides.left, right: sides.right, match: m, isSwapped: swapped)
+                ]
+            }
+        }
+
+        // Apply filter only to the left side
+        let leftFiltered: [DisplayMatch]
+        if let team = selectedTeam?.rawValue {
+            leftFiltered = expanded.filter { $0.left == team }
+        } else {
+            leftFiltered = expanded
+        }
+
+        processedMatches = leftFiltered
+        visibleCount = min(6, leftFiltered.count)
     }
 
     var body: some View {
@@ -91,7 +126,7 @@ struct ResultsView: View {
                         .foregroundColor(.secondary)
                 }
                 .padding(.top, 20)
-            } else if viewModel.hasLoaded && filteredMatches.isEmpty {
+            } else if viewModel.hasLoaded && displayedMatches.isEmpty {
                 VStack(spacing: 12) {
                     Image(systemName: "trophy.fill")
                         .font(.largeTitle)
@@ -107,15 +142,48 @@ struct ResultsView: View {
                 .padding(.top, 20)
             } else {
                 // Results content
-                VStack(spacing: 0) {
-                    ForEach(filteredMatches) { match in
-                        ResultCard(match: match)
+                let matches = displayedMatches
+                let limited = Array(matches.prefix(visibleCount))
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(limited) { dm in
+                            // Build a display-only match with sides swapped if needed
+                            let m = dm.match
+                            let displayMatch: Match = dm.isSwapped ?
+                                Match(id: m.id, date: m.date, team1: dm.left, team2: dm.right, team1Score: m.team2Score, team2Score: m.team1Score, gameWeek: m.gameWeek) :
+                                Match(id: m.id, date: m.date, team1: dm.left, team2: dm.right, team1Score: m.team1Score, team2Score: m.team2Score, gameWeek: m.gameWeek)
+                            ResultCard(match: displayMatch)
+                        }
+                        if matches.count > visibleCount {
+                            Button(action: {
+                                visibleCount = min(visibleCount + 6, matches.count)
+                            }) {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "plus.circle-fill")
+                                    Text("View more")
+                                }
+                                .font(.subheadline)
+                                .padding(.vertical, 12)
+                                .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(Color.accentColor)
+                            .padding(.horizontal, 16)
+                            .padding(.top, 12)
+                            .padding(.bottom, 24)
+                        }
                     }
+                    .padding(.top, 8)
                 }
-                .padding(.top, 8)
             }
         }
         .onAppear { viewModel.fetchMatches() }
+        .onChange(of: selectedTeam) {
+            recomputeMatches()
+        }
+        .onChange(of: viewModel.matches) {
+            recomputeMatches()
+        }
     }
 
 }

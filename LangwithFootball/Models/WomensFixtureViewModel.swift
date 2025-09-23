@@ -21,12 +21,10 @@ final class WomensFixtureViewModel: ObservableObject {
                 guard let self = self else { return }
                 if case .failure(let error) = completion {
                     self.errorMessage = "Failed to load women's fixtures: \(error.localizedDescription)"
-                    print("❌ Decoding or network error:", error)
                 }
             }, receiveValue: { [weak self] fixtures in
                 guard let self = self else { return }
                 self.fixtures = fixtures
-                print("✅ Loaded women's fixtures:", fixtures)
             })
             .store(in: &cancellables)
     }

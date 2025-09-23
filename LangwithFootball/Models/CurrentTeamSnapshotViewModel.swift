@@ -21,13 +21,11 @@ class CurrentTeamSnapshotViewModel: ObservableObject {
                 guard let self = self else { return }
                 if case .failure(let error) = completion {
                     self.errorMessage = "Failed to load current team snapshot: \(error.localizedDescription)"
-                    print("❌ Decoding or network error:", error)
                 }
             }, receiveValue: { [weak self] snapshots in
                 guard let self = self else { return }
                 // Get the most recent snapshot (current team)
                 self.currentSnapshot = snapshots.sorted { $0.snapshotDate > $1.snapshotDate }.first
-                print("✅ Loaded current team snapshot:", self.currentSnapshot?.id ?? "none")
             })
             .store(in: &cancellables)
     }

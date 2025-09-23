@@ -3,7 +3,7 @@
 
 import Foundation
 
-struct Fixture: Identifiable, Codable {
+struct Fixture: Identifiable, Codable, Equatable {
     let id: Int
     let date: Date       // parsed from "yyyy-MM-dd"
     let time: Date       // parsed from "HH:mm:ss" (anchored to a reference date)

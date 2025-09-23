@@ -136,7 +136,7 @@ struct HomeView: View {
     // MARK: - Next Fixtures Section
     private var nextFixturesSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            sectionHeader(title: "📅 Next Fixtures", icon: "calendar.badge.clock")
+            sectionHeader(title: "📅 Upcoming Fixtures", icon: "calendar.badge.clock")
             
             if fixtureViewModel.isLoading {
                 loadingCard(message: "Loading fixtures...")
@@ -366,7 +366,7 @@ struct HomeView: View {
         let today = calendar.startOfDay(for: currentDate)
         
         // Find the most recent day with results
-        for dayOffset in 0...7 { // Check last 7 days including today
+        for dayOffset in 0...30 { // Check last 30 days including today
             let checkDate = calendar.date(byAdding: .day, value: -dayOffset, to: today)!
             let dayResults = matchViewModel.matches.filter { match in
                 calendar.isDate(match.date, inSameDayAs: checkDate)
@@ -396,7 +396,6 @@ struct HomeView: View {
     private func openInGoogleMaps() {
         let latitude = 53.951702
         let longitude = -1.016212
-        let locationName = "3G at York Sport Village"
         
         if let url = URL(string: "comgooglemaps://?q=\(latitude),\(longitude)&zoom=14&views=traffic") {
             if UIApplication.shared.canOpenURL(url) {

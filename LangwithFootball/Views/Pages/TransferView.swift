@@ -74,19 +74,24 @@ struct TransferView: View {
                 .background(Color(.systemBackground))
             }
         }
-        .sheet(item: $selectedPosition) { position in
-            PlayerSelectionModal(
-                players: viewModel.players,
-                position: position,
-                isPlayerSelected: viewModel.isPlayerSelected,
-                onPlayerSelect: { playerId in
-                    viewModel.selectPlayer(playerId: playerId, for: position)
-                    selectedPosition = nil
-                },
-                onDismiss: {
-                    selectedPosition = nil
-                }
-            )
+        .sheet(isPresented: Binding<Bool>(
+            get: { selectedPosition != nil },
+            set: { if !$0 { selectedPosition = nil } }
+        )) {
+            if let position = selectedPosition {
+                PlayerSelectionModal(
+                    players: viewModel.players,
+                    position: position,
+                    isPlayerSelected: viewModel.isPlayerSelected,
+                    onPlayerSelect: { playerId in
+                        viewModel.selectPlayer(playerId: playerId, for: position)
+                        selectedPosition = nil
+                    },
+                    onDismiss: {
+                        selectedPosition = nil
+                    }
+                )
+            }
         }
     }
 }
@@ -105,9 +110,23 @@ private struct TransferHeaderCard: View {
                     .foregroundStyle(.white)
 
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Team: \(String(teamName))")
-                        .font(.headline)
-                        .foregroundColor(.white)
+                    HStack(spacing: 10) {
+                        Text("Team:")
+                            .font(.headline)
+                            .foregroundColor(.white)
+
+                        Text(String(teamName))
+                            .font(.headline.weight(.bold))
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(
+                                Capsule().fill(.white.opacity(0.2))
+                            )
+                            .overlay(
+                                Capsule().stroke(.white.opacity(0.3), lineWidth: 1)
+                            )
+                            .foregroundStyle(.white)
+                    }
                 }
                 
                 HStack {
@@ -173,8 +192,8 @@ private struct TransferFormationView: View {
 
             LazyVStack(spacing: 25, pinnedViews: []) {
                     // Attackers
-                    LazyHStack(spacing: 14) {
-                        ForEach(viewModel.formationPositions.filter { $0.hasPrefix("Attacker") }, id: \.self) { position in
+                    LazyHStack(spacing: attackerSpacing) {
+                        ForEach(Array(viewModel.formationPositions.filter { $0.hasPrefix("Attacker") }.enumerated()), id: \.offset) { index, position in
                             if viewModel.getSelectedPlayerCount() < 10 || viewModel.getPlayerForPosition(position) != nil {
                                 if position == "Attacker-2" && viewModel.onlyOneAttackerAllowed && viewModel.selectedPlayers["Attacker-2"] == nil {
                                     EmptyView()
@@ -184,7 +203,13 @@ private struct TransferFormationView: View {
                                         selectedPlayer: viewModel.getPlayerForPosition(position),
                                         onTap: { onPlayerTap(position) },
                                         onDeselect: { viewModel.deselectPlayer(at: position) },
-                                        context: .transfer
+                                        context: .transfer,
+                                        isCaptain: viewModel.captainId != nil && viewModel.captainId == viewModel.getPlayerForPosition(position)?.id,
+                                        onMakeCaptain: {
+                                            if let id = viewModel.getPlayerForPosition(position)?.id {
+                                                viewModel.setCaptain(playerId: id)
+                                            }
+                                        }
                                     )
                                 }
                             }
@@ -196,21 +221,33 @@ private struct TransferFormationView: View {
                                 selectedPlayer: viewModel.getPlayerForPosition("Attacker-3"),
                                 onTap: { onPlayerTap("Attacker-3") },
                                 onDeselect: { viewModel.deselectPlayer(at: "Attacker-3") },
-                                context: .transfer
+                                context: .transfer,
+                                isCaptain: viewModel.captainId != nil && viewModel.captainId == viewModel.getPlayerForPosition("Attacker-3")?.id,
+                                onMakeCaptain: {
+                                    if let id = viewModel.getPlayerForPosition("Attacker-3")?.id {
+                                        viewModel.setCaptain(playerId: id)
+                                    }
+                                }
                             )
                         }
                     }
 
                     // Midfielders
-                    LazyHStack(spacing: 10) {
-                        ForEach(viewModel.formationPositions.filter { $0.hasPrefix("Midfielder") }, id: \.self) { position in
+                    LazyHStack(spacing: midfielderSpacing) {
+                        ForEach(Array(viewModel.formationPositions.filter { $0.hasPrefix("Midfielder") }.enumerated()), id: \.offset) { index, position in
                             if viewModel.getSelectedPlayerCount() < 10 || viewModel.getPlayerForPosition(position) != nil {
                                 TeamPlayerIconView(
                                     position: position,
                                     selectedPlayer: viewModel.getPlayerForPosition(position),
                                     onTap: { onPlayerTap(position) },
                                     onDeselect: { viewModel.deselectPlayer(at: position) },
-                                    context: .transfer
+                                    context: .transfer,
+                                    isCaptain: viewModel.captainId != nil && viewModel.captainId == viewModel.getPlayerForPosition(position)?.id,
+                                    onMakeCaptain: {
+                                        if let id = viewModel.getPlayerForPosition(position)?.id {
+                                            viewModel.setCaptain(playerId: id)
+                                        }
+                                    }
                                 )
                             }
                         }
@@ -221,21 +258,33 @@ private struct TransferFormationView: View {
                                 selectedPlayer: viewModel.getPlayerForPosition("Midfielder-5"),
                                 onTap: { onPlayerTap("Midfielder-5") },
                                 onDeselect: { viewModel.deselectPlayer(at: "Midfielder-5") },
-                                context: .transfer
+                                context: .transfer,
+                                isCaptain: viewModel.captainId != nil && viewModel.captainId == viewModel.getPlayerForPosition("Midfielder-5")?.id,
+                                onMakeCaptain: {
+                                    if let id = viewModel.getPlayerForPosition("Midfielder-5")?.id {
+                                        viewModel.setCaptain(playerId: id)
+                                    }
+                                }
                             )
                         }
                     }
 
                     // Defenders
-                    LazyHStack(spacing: 10) {
-                        ForEach(viewModel.formationPositions.filter { $0.hasPrefix("Defender") }, id: \.self) { position in
+                    LazyHStack(spacing: defenderSpacing) {
+                        ForEach(Array(viewModel.formationPositions.filter { $0.hasPrefix("Defender") }.enumerated()), id: \.offset) { index, position in
                             if viewModel.getSelectedPlayerCount() < 10 || viewModel.getPlayerForPosition(position) != nil {
                                 TeamPlayerIconView(
                                     position: position,
                                     selectedPlayer: viewModel.getPlayerForPosition(position),
                                     onTap: { onPlayerTap(position) },
                                     onDeselect: { viewModel.deselectPlayer(at: position) },
-                                    context: .transfer
+                                    context: .transfer,
+                                    isCaptain: viewModel.captainId != nil && viewModel.captainId == viewModel.getPlayerForPosition(position)?.id,
+                                    onMakeCaptain: {
+                                        if let id = viewModel.getPlayerForPosition(position)?.id {
+                                            viewModel.setCaptain(playerId: id)
+                                        }
+                                    }
                                 )
                             }
                         }
@@ -246,7 +295,13 @@ private struct TransferFormationView: View {
                                 selectedPlayer: viewModel.getPlayerForPosition("Defender-5"),
                                 onTap: { onPlayerTap("Defender-5") },
                                 onDeselect: { viewModel.deselectPlayer(at: "Defender-5") },
-                                context: .transfer
+                                context: .transfer,
+                                isCaptain: viewModel.captainId != nil && viewModel.captainId == viewModel.getPlayerForPosition("Defender-5")?.id,
+                                onMakeCaptain: {
+                                    if let id = viewModel.getPlayerForPosition("Defender-5")?.id {
+                                        viewModel.setCaptain(playerId: id)
+                                    }
+                                }
                             )
                         }
                     }
@@ -258,7 +313,13 @@ private struct TransferFormationView: View {
                             selectedPlayer: viewModel.getPlayerForPosition("Goalkeeper"),
                             onTap: { onPlayerTap("Goalkeeper") },
                             onDeselect: { viewModel.deselectPlayer(at: "Goalkeeper") },
-                            context: .transfer
+                            context: .transfer,
+                            isCaptain: viewModel.captainId != nil && viewModel.captainId == viewModel.getPlayerForPosition("Goalkeeper")?.id,
+                            onMakeCaptain: {
+                                if let id = viewModel.getPlayerForPosition("Goalkeeper")?.id {
+                                    viewModel.setCaptain(playerId: id)
+                                }
+                            }
                         )
                     }
             }
@@ -267,6 +328,26 @@ private struct TransferFormationView: View {
             .padding(.bottom, 16)
         }
         .background(Color.black.opacity(0.05))
+    }
+    
+    // MARK: - Dynamic Spacing Calculations
+    
+    private var attackerSpacing: CGFloat {
+        let baseAttackers = viewModel.formationPositions.filter { $0.hasPrefix("Attacker") }.count
+        let additionalAttackers = (viewModel.additionalAttackerAllowed || viewModel.selectedPlayers["Attacker-3"] != nil) ? 1 : 0
+        return FormationSpacingUtility.spacingForPositionGroup(baseCount: baseAttackers, additionalCount: additionalAttackers)
+    }
+    
+    private var midfielderSpacing: CGFloat {
+        let baseMidfielders = viewModel.formationPositions.filter { $0.hasPrefix("Midfielder") }.count
+        let additionalMidfielders = (viewModel.additionalMidfielderAllowed || viewModel.selectedPlayers["Midfielder-5"] != nil) ? 1 : 0
+        return FormationSpacingUtility.spacingForPositionGroup(baseCount: baseMidfielders, additionalCount: additionalMidfielders)
+    }
+    
+    private var defenderSpacing: CGFloat {
+        let baseDefenders = viewModel.formationPositions.filter { $0.hasPrefix("Defender") }.count
+        let additionalDefenders = (viewModel.additionalDefenderAllowed || viewModel.selectedPlayers["Defender-5"] != nil) ? 1 : 0
+        return FormationSpacingUtility.spacingForPositionGroup(baseCount: baseDefenders, additionalCount: additionalDefenders)
     }
 }
 
@@ -280,7 +361,7 @@ private struct TransferSelectedPlayersSummary: View {
                 .foregroundColor(.primary)
 
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                ForEach(Array(viewModel.selectedPlayers.keys.sorted()), id: \.self) { position in
+                ForEach(Array(viewModel.selectedPlayers.keys.sorted().enumerated()), id: \.offset) { index, position in
                     if let player = viewModel.getPlayerForPosition(position) {
                         HStack {
                             Text(player.name)

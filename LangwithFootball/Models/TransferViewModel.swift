@@ -17,6 +17,7 @@ final class TransferViewModel: ObservableObject {
     @Published var selectedFormation: String = "4-4-2"
     @Published var isLoading: Bool = true
     @Published var errorMessage: String?
+    @Published var captainId: Int? = nil
 
     private var cancellables = Set<AnyCancellable>()
 
@@ -72,6 +73,10 @@ final class TransferViewModel: ObservableObject {
         for (index, a) in atts.prefix(3).enumerated() { selections["Attacker-\(index + 1)"] = a.id }
 
         selectedPlayers = selections
+        // Set current captain if provided by API
+        if let cap = team.captain {
+            captainId = cap.id
+        }
 
         // Compute remaining budget from 100 - sum(prices)
         let spent = selections.values.compactMap { id in
@@ -163,6 +168,14 @@ final class TransferViewModel: ObservableObject {
         return players.filter { $0.position == positionType }
     }
 
+    // MARK: - Captain
+    func setCaptain(playerId: Int) {
+        // Only allow setting captain among currently selected players
+        if selectedPlayers.values.contains(playerId) {
+            captainId = playerId
+        }
+    }
+
     // MARK: - Update Team
     func canUpdateTeam() -> Bool {
         return getSelectedPlayerCount() == 10 && selectedPlayers["Goalkeeper"] != nil
@@ -170,7 +183,7 @@ final class TransferViewModel: ObservableObject {
 
     func updateTeam(completion: @escaping (Result<Team, Error>) -> Void) {
         guard canUpdateTeam() else { return }
-        let payload = UpdateTeamRequest(players: Array(selectedPlayers.values), formation: selectedFormation)
+        let payload = UpdateTeamRequest(players: Array(selectedPlayers.values), formation: selectedFormation, captain: captainId)
         APIService.shared.updateTeam(teamData: payload)
             .receive(on: DispatchQueue.main)
             .sink(receiveCompletion: { result in
@@ -185,6 +198,7 @@ final class TransferViewModel: ObservableObject {
 struct UpdateTeamRequest: Codable {
     let players: [Int]
     let formation: String
+    let captain: Int?
 }
 
 

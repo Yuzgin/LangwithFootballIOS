@@ -16,6 +16,7 @@ struct FantasyView: View {
     @StateObject private var teamViewModel = TeamViewModel()
     @State private var showingTransferView = false
     @State private var showingTopTeamSheet = false
+    @State private var showingLeagueTable = false
     @State private var refreshTrigger = false
     @State private var showGateLoading = true
     @State private var selectedGameWeek: Int? = nil
@@ -30,7 +31,14 @@ struct FantasyView: View {
                     EmptyView()
                 } else if createTeamViewModel.hasTeam {
                     // User has a team - show normal fantasy view
-                    if let snapshot = getCurrentSnapshot() {
+                    
+                    if let error = viewModel.errorMessage {
+                        Text(error)
+                            .foregroundColor(.red)
+                            .font(.title3)
+                            .padding(.vertical, 8)
+                    } else if let snapshot = getCurrentSnapshot() {
+                        // Show fantasy card and formation for existing snapshot
                         CurrentTeamSnapshotCard(
                             teamName: snapshot.team.name,
                             weeklyPoints: snapshot.weeklyPoints,
@@ -46,7 +54,8 @@ struct FantasyView: View {
 
                         FormationView(
                             players: snapshot.players,
-                            playerWeeklyPoints: getWeeklyPointsForSnapshot(snapshot)
+                            playerWeeklyPoints: getWeeklyPointsForSnapshot(snapshot),
+                            captain: snapshot.captain
                         )
                         .transition(.opacity)
                         
@@ -83,28 +92,138 @@ struct FantasyView: View {
                         }
                         .padding(.horizontal)
                         
-                    } else if let error = viewModel.errorMessage {
-                        Text(error)
-                            .foregroundColor(.red)
-                            .font(.title3)
-                            .padding(.vertical, 8)
-                    } else {
-                        // Waiting for snapshots — overlay handles loading UI
-                        EmptyView()
-                    }
-                } else {
-                    // User doesn't have a team - show create team view
-                    CreateTeamView()
-                        .environmentObject(createTeamViewModel)
-                        .onAppear {
-                            // Refresh team status when view appears
-                            createTeamViewModel.checkIfUserHasTeam()
+                        // League Position Card
+                        LeaguePositionCard(
+                            teamName: snapshot.team.name,
+                            teamId: snapshot.team.id,
+                            allSnapshots: viewModel.snapshots,
+                            onTap: {
+                                showingLeagueTable = true
+                            }
+                        )
+                        .padding(.horizontal)
+                        
+                    } else if selectedGameWeek != nil {
+                        // Show fantasy card for navigation but no formation/content for missing snapshot
+                        if let team = teamViewModel.team {
+                            CurrentTeamSnapshotCard(
+                                teamName: team.name,
+                                weeklyPoints: 0, // No points for missing gameweek
+                                gameWeek: selectedGameWeek!,
+                                selectedGameWeek: $selectedGameWeek,
+                                allSnapshots: viewModel.snapshots,
+                                gameWeeks: gameWeekViewModel.gameWeeks,
+                                currentTeamId: team.id,
+                                onTopTeamTap: {
+                                    showingTopTeamSheet = true
+                                }
+                            )
+                        } else {
+                            // Team not loaded yet, show loading or fallback
+                            VStack(spacing: 16) {
+                                ProgressView()
+                                    .scaleEffect(1.2)
+                                Text("Loading team information...")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                            }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
                         }
-                        .onChange(of: createTeamViewModel.hasTeam) { hasTeam in
-                            if hasTeam {
-                                viewModel.fetchTeamSnapshots()
+                        
+                        // Transfers Button (should be available even if no snapshot exists for this week)
+                        Button(action: {
+                            showingTransferView = true
+                        }) {
+                            HStack {
+                                Image(systemName: "arrow.left.arrow.right")
+                                    .font(.title2)
+                                Text("Make Transfers")
+                                    .font(.headline.weight(.semibold))
+                            }
+                            .foregroundColor(.black)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [
+                                                Color.white,
+                                                Color(white: 0.92)
+                                            ],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .strokeBorder(Color.black.opacity(0.1), lineWidth: 1)
+                            )
+                        }
+                        .padding(.horizontal)
+                        
+                        // Show message for missing snapshot
+                        VStack(spacing: 16) {
+                            Image(systemName: "exclamationmark.triangle")
+                                .font(.system(size: 50))
+                                .foregroundColor(.orange)
+
+                            if selectedGameWeek == 0 {
+                                Text("Season starts on 1st October")
+                                    .font(.title2.weight(.semibold))
+                                    .foregroundColor(.primary)
+                            } else {
+                                Text("No Team for Gameweek \(selectedGameWeek!)")
+                                    .font(.title2.weight(.semibold))
+                                    .foregroundColor(.primary)
                             }
                         }
+                        .padding()
+                        .frame(maxWidth: .infinity)
+                        .background(
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(Color(.systemBackground))
+                                .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
+                        )
+                        .padding(.horizontal)
+                        
+                    } else {
+                        // Waiting for snapshots or team data — show loading
+                        VStack(spacing: 16) {
+                            ProgressView()
+                                .scaleEffect(1.2)
+                            Text("Loading...")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
+                } else {
+                    // User doesn't have a team - show create team view or error
+                    if let errorMessage = createTeamViewModel.errorMessage {
+                        // Show error message if there was a problem checking team status
+                        VStack(spacing: 16) {
+                            Text("Error")
+                                .font(.title2.weight(.bold))
+                                .foregroundColor(.red)
+                            
+                            Text(errorMessage)
+                                .font(.body)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                            
+                            Button("Retry") {
+                                createTeamViewModel.checkIfUserHasTeam()
+                            }
+                            .buttonStyle(.borderedProminent)
+                        }
+                        .padding()
+                    } else {
+                        // Show create team view
+                        CreateTeamView()
+                            .environmentObject(createTeamViewModel)
+                    }
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -112,7 +231,7 @@ struct FantasyView: View {
             .padding()
             .overlay(alignment: .center) {
                 // Central loading overlay, centered, with 0.5s hold after loading completes
-                let isSnapshotLoading = createTeamViewModel.hasTeam && viewModel.snapshots.isEmpty && viewModel.errorMessage == nil
+                let isSnapshotLoading = createTeamViewModel.hasTeam && viewModel.isLoading
                 let shouldShowOverlay = createTeamViewModel.isCheckingTeam || isSnapshotLoading
                 if showGateLoading || shouldShowOverlay {
                     FantasyLoadingView()
@@ -121,26 +240,36 @@ struct FantasyView: View {
             }
             .onAppear { 
                 showGateLoading = true
-                viewModel.fetchTeamSnapshots()
+                // Only check team status first, then fetch other data based on result
                 createTeamViewModel.checkIfUserHasTeam()
+                
+                // Fetch public data that doesn't require team existence
                 gameWeekViewModel.fetchGameWeeks()
                 playerGameStatsViewModel.fetchPlayerGameStats()
-                teamViewModel.fetchTeam()
             }
-            .onChange(of: createTeamViewModel.isCheckingTeam) { _ in
+            .onChange(of: createTeamViewModel.isCheckingTeam) {
                 handleOverlayVisibility()
             }
-            .onChange(of: createTeamViewModel.hasTeam) { _ in
+            .onChange(of: createTeamViewModel.hasTeam) { _, hasTeam in
                 handleOverlayVisibility()
+                if hasTeam {
+                    // User has a team, fetch team-specific data
+                    viewModel.fetchTeamSnapshots()
+                    teamViewModel.fetchTeam()
+                }
             }
-            .onChange(of: viewModel.snapshots.count) { _ in
+            .onChange(of: viewModel.snapshots.count) {
                 handleOverlayVisibility()
                 setInitialGameWeek()
             }
-            .onChange(of: gameWeekViewModel.gameWeeks.count) { _ in
+            .onChange(of: viewModel.isLoading) {
+                handleOverlayVisibility()
                 setInitialGameWeek()
             }
-            .onChange(of: teamViewModel.team?.id) { _ in
+            .onChange(of: gameWeekViewModel.gameWeeks.count) {
+                setInitialGameWeek()
+            }
+            .onChange(of: teamViewModel.team?.id) {
                 setInitialGameWeek()
             }
             .sheet(isPresented: $showingTransferView) {
@@ -152,6 +281,9 @@ struct FantasyView: View {
                     allSnapshots: viewModel.snapshots,
                     playerGameStats: playerGameStatsViewModel.stats
                 )
+            }
+            .sheet(isPresented: $showingLeagueTable) {
+                FantasyLeagueTableViewAllTeams()
             }
         } else {
             // Show login form when not logged in
@@ -175,8 +307,9 @@ private struct FantasyLoadingView: View {
 // MARK: - Overlay Visibility Handling
 extension FantasyView {
     private func handleOverlayVisibility() {
-        let isSnapshotLoading = createTeamViewModel.hasTeam && viewModel.snapshots.isEmpty && viewModel.errorMessage == nil
+        let isSnapshotLoading = createTeamViewModel.hasTeam && viewModel.isLoading
         let shouldShowOverlay = createTeamViewModel.isCheckingTeam || isSnapshotLoading
+        
         if shouldShowOverlay {
             if !showGateLoading {
                 withAnimation(.easeInOut(duration: 0.2)) {
@@ -200,36 +333,31 @@ extension FantasyView {
         let userSnapshots = viewModel.snapshots.filter { $0.team.id == currentTeamId }
         
         if let selectedWeek = selectedGameWeek {
-            // Return snapshot for selected gameweek, or most recent if not found
-            return userSnapshots.first { $0.gameWeek.week == selectedWeek } 
-                ?? userSnapshots.sorted(by: { $0.snapshotDate > $1.snapshotDate }).first
+            // Return snapshot for selected gameweek, or nil if not found
+            return userSnapshots.first { $0.gameWeek.week == selectedWeek }
         } else {
             // Return most recent snapshot for current user's team
             return userSnapshots.sorted(by: { $0.snapshotDate > $1.snapshotDate }).first
         }
     }
     
+    private func getMostRecentSnapshot() -> TeamSnapshot? {
+        // Get current user's team ID
+        guard let currentTeamId = teamViewModel.team?.id else { return nil }
+        
+        // Filter snapshots to only include the current user's team
+        let userSnapshots = viewModel.snapshots.filter { $0.team.id == currentTeamId }
+        
+        // Return most recent snapshot for current user's team
+        return userSnapshots.sorted(by: { $0.snapshotDate > $1.snapshotDate }).first
+    }
+    
     private func getWeeklyPointsForSnapshot(_ snapshot: TeamSnapshot) -> [Int: Int] {
-        let gameWeekId = snapshot.gameWeek.id
-        
-        // Filter game stats to only include those for the selected gameweek
-        let filteredStats = playerGameStatsViewModel.stats.filter { stat in
-            stat.match.gameWeek == gameWeekId
-        }
-        
-        // Group stats by player ID and sum up points for each player
+        // Use pre-calculated points from the team snapshot players, just like the React implementation
         var weeklyPoints: [Int: Int] = [:]
         
-        for stat in filteredStats {
-            let playerId = stat.player.id
-            weeklyPoints[playerId, default: 0] += stat.points
-        }
-        
-        // For players in the snapshot who don't have game stats for this week, set points to 0
         for player in snapshot.players {
-            if weeklyPoints[player.id] == nil {
-                weeklyPoints[player.id] = 0
-            }
+            weeklyPoints[player.id] = player.points
         }
         
         return weeklyPoints
@@ -237,14 +365,24 @@ extension FantasyView {
     
     private func setInitialGameWeek() {
         guard selectedGameWeek == nil else { return }
-        guard !viewModel.snapshots.isEmpty && !gameWeekViewModel.gameWeeks.isEmpty else { return }
-        guard let currentTeamId = teamViewModel.team?.id else { return }
+        guard let currentTeamId = teamViewModel.team?.id else { 
+            return 
+        }
         
-        // Set to the most recent gameweek that has a snapshot for the current user's team
+        // If user has snapshots, set to the most recent gameweek that has a snapshot
         let userSnapshots = viewModel.snapshots.filter { $0.team.id == currentTeamId }
         let sortedSnapshots = userSnapshots.sorted(by: { $0.snapshotDate > $1.snapshotDate })
         if let mostRecentSnapshot = sortedSnapshots.first {
             selectedGameWeek = mostRecentSnapshot.gameWeek.week
+        } else if !viewModel.isLoading {
+            // User has no snapshots and loading is complete, set to current gameweek or fallback
+            if !gameWeekViewModel.gameWeeks.isEmpty {
+                let currentGameWeek = gameWeekViewModel.gameWeeks.first { $0.isCurrent }?.week ?? gameWeekViewModel.gameWeeks.first?.week ?? 0
+                selectedGameWeek = currentGameWeek
+            } else {
+                // Fallback: set to week 0 if no gameweeks loaded
+                selectedGameWeek = 0
+            }
         }
     }
 }
@@ -360,23 +498,24 @@ private struct CurrentTeamSnapshotCard: View {
                     VStack(alignment: .center, spacing: 4) {
                         Text("Highest")
                             .font(.caption.weight(.medium))
-                            .foregroundStyle(.white.opacity(0.8))
+                            .foregroundStyle(.white.opacity(selectedGameWeek == 0 ? 0.3 : 0.8))
                         ZStack {
                             Circle()
                                 .fill(.ultraThinMaterial)
                                 .frame(width: 50, height: 50)
                                 .overlay(
                                     Circle()
-                                        .strokeBorder(.white.opacity(0.25), lineWidth: 1.5)
+                                        .strokeBorder(.white.opacity(selectedGameWeek == 0 ? 0.1 : 0.25), lineWidth: 1.5)
                                 )
                             let topPoints = getTopTeamPoints(for: selectedGameWeek ?? gameWeek)
                             Text("\(topPoints)")
                                 .font(.subheadline.weight(.bold))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(.white.opacity(selectedGameWeek == 0 ? 0.3 : 1.0))
                         }
                     }
                 }
                 .buttonStyle(.plain)
+                .disabled(selectedGameWeek == 0)
             }
         }
         .padding(6)
@@ -432,6 +571,262 @@ private struct CurrentTeamSnapshotCard: View {
     private func getTopSnapshot(for gameWeek: Int) -> TeamSnapshot? {
         let snapshotsForWeek = allSnapshots.filter { $0.gameWeek.week == gameWeek }
         return snapshotsForWeek.max(by: { $0.weeklyPoints < $1.weeklyPoints })
+    }
+}
+
+// MARK: - League Position Card
+private struct LeaguePositionCard: View {
+    let teamName: String
+    let teamId: Int
+    let allSnapshots: [TeamSnapshot]
+    let onTap: () -> Void
+    @StateObject private var leaderboardVM = TeamViewModel()
+    
+    private var leaguePosition: Int {
+        if !leaderboardVM.teams.isEmpty {
+            let sorted = leaderboardVM.teams.sorted { a, b in
+                if a.totalPoints == b.totalPoints { return a.name < b.name }
+                return a.totalPoints > b.totalPoints
+            }
+            if let idx = sorted.firstIndex(where: { $0.id == teamId }) {
+                return idx + 1
+            }
+            return sorted.count
+        }
+        return calculateLeaguePositionFromSnapshots()
+    }
+    
+    private var totalTeams: Int {
+        if !leaderboardVM.teams.isEmpty { return leaderboardVM.teams.count }
+        let uniqueTeamIds = Set(allSnapshots.map { $0.team.id })
+        return uniqueTeamIds.count
+    }
+    
+    var body: some View {
+        Button(action: { onTap() }) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("League Position")
+                            .font(.caption.weight(.medium))
+                            .foregroundColor(.secondary)
+                        
+                        Text(teamName)
+                            .font(.headline.weight(.semibold))
+                            .foregroundColor(.primary)
+                    }
+                    
+                    Spacer()
+                    
+                    VStack(alignment: .trailing, spacing: 4) {
+                        Text("Position")
+                            .font(.caption.weight(.medium))
+                            .foregroundColor(.secondary)
+                        
+                        HStack(spacing: 4) {
+                            Text("\(leaguePosition)")
+                                .font(.title2.weight(.bold))
+                                .foregroundColor(.primary)
+                            
+                            Text("of \(totalTeams)")
+                                .font(.subheadline.weight(.medium))
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+            }
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color(.systemBackground))
+                    .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .strokeBorder(Color.black.opacity(0.1), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .onAppear {
+            if leaderboardVM.teams.isEmpty {
+                leaderboardVM.fetchTeams()
+            }
+        }
+    }
+    
+    private func calculateLeaguePositionFromSnapshots() -> Int {
+        // Calculate total points for each team across all gameweeks
+        var teamTotalPoints: [Int: Int] = [:]
+        
+        for snapshot in allSnapshots {
+            let teamId = snapshot.team.id
+            teamTotalPoints[teamId, default: 0] += snapshot.weeklyPoints
+        }
+        
+        // Sort teams by total points (descending)
+        let sortedTeams = teamTotalPoints.sorted { $0.value > $1.value }
+        
+        // Find the position of the current team
+        for (index, teamData) in sortedTeams.enumerated() {
+            if teamData.key == teamId {
+                return index + 1
+            }
+        }
+        
+        return totalTeams // Default to last position if not found
+    }
+    
+    init(teamName: String, teamId: Int, allSnapshots: [TeamSnapshot], onTap: @escaping () -> Void) {
+        self.teamName = teamName
+        self.teamId = teamId
+        self.allSnapshots = allSnapshots
+        self.onTap = onTap
+        _leaderboardVM = StateObject(wrappedValue: TeamViewModel())
+    }
+}
+
+
+// MARK: - Fantasy League Table View
+private struct FantasyLeagueTableView: View {
+    let allSnapshots: [TeamSnapshot]
+
+    private struct TeamStanding: Identifiable {
+        let id: Int
+        let name: String
+        let totalPoints: Int
+        let rank: Int
+    }
+
+    private var standings: [TeamStanding] {
+        var totals: [Int: (name: String, points: Int)] = [:]
+        for snapshot in allSnapshots {
+            let id = snapshot.team.id
+            let name = snapshot.team.name
+            totals[id] = (name, (totals[id]?.points ?? 0) + snapshot.weeklyPoints)
+        }
+        let sorted = totals
+            .map { (id, data) in (id: id, name: data.name, points: data.points) }
+            .sorted { a, b in
+                if a.points == b.points { return a.name < b.name }
+                return a.points > b.points
+            }
+        return sorted.enumerated().map { index, item in
+            TeamStanding(id: item.id, name: item.name, totalPoints: item.points, rank: index + 1)
+        }
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text("Fantasy League Table")
+                    .font(.title2.weight(.bold))
+                Spacer()
+            }
+            .padding(.horizontal)
+            .padding(.top, 16)
+            .padding(.bottom, 8)
+
+            List(standings) { standing in
+                HStack(spacing: 12) {
+                    ZStack {
+                        Circle()
+                            .fill(Color.blue.opacity(0.12))
+                            .frame(width: 36, height: 36)
+                        Text("\(standing.rank)")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundColor(.blue)
+                    }
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(standing.name)
+                            .font(.body.weight(.semibold))
+                            .foregroundColor(.primary)
+                        Text("Total points")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    Spacer()
+                    Text("\(standing.totalPoints)")
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                }
+                .listRowBackground(Color(.systemBackground))
+            }
+            .listStyle(.insetGrouped)
+        }
+        .presentationDetents([.medium, .large])
+    }
+}
+
+// MARK: - Fantasy League Table View (All Teams via API)
+private struct FantasyLeagueTableViewAllTeams: View {
+    @StateObject private var teamVM = TeamViewModel()
+
+    private struct TeamStanding: Identifiable {
+        let id: Int
+        let name: String
+        let totalPoints: Int
+        let rank: Int
+    }
+
+    private var standings: [TeamStanding] {
+        let sorted = teamVM.teams.sorted { a, b in
+            if a.totalPoints == b.totalPoints { return a.name < b.name }
+            return a.totalPoints > b.totalPoints
+        }
+        return sorted.enumerated().map { index, team in
+            TeamStanding(id: team.id, name: team.name, totalPoints: team.totalPoints, rank: index + 1)
+        }
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text("Fantasy League Table")
+                    .font(.title2.weight(.bold))
+                Spacer()
+            }
+            .padding(.horizontal)
+            .padding(.top, 16)
+            .padding(.bottom, 8)
+
+            if teamVM.teams.isEmpty {
+                ProgressView()
+                    .padding()
+                    .onAppear {
+                        teamVM.fetchTeams()
+                    }
+            } else {
+                List(standings) { standing in
+                    HStack(spacing: 12) {
+                        ZStack {
+                            Circle()
+                                .fill(Color.blue.opacity(0.12))
+                                .frame(width: 36, height: 36)
+                            Text("\(standing.rank)")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundColor(.blue)
+                        }
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(standing.name)
+                                .font(.body.weight(.semibold))
+                                .foregroundColor(.primary)
+                            Text("Total points")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        Spacer()
+                        Text("\(standing.totalPoints)")
+                            .font(.headline)
+                            .foregroundColor(.primary)
+                    }
+                    .listRowBackground(Color(.systemBackground))
+                }
+                .listStyle(.insetGrouped)
+            }
+        }
+        .presentationDetents([.medium, .large])
     }
 }
 

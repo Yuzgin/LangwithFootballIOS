@@ -21,12 +21,10 @@ final class GameWeekViewModel: ObservableObject {
                 guard let self = self else { return }
                 if case .failure(let error) = completion {
                     self.errorMessage = "Failed to load game weeks: \(error.localizedDescription)"
-                    print("❌ Decoding or network error:", error)
                 }
             }, receiveValue: { [weak self] weeks in
                 guard let self = self else { return }
                 self.gameWeeks = weeks
-                print("✅ Loaded GameWeeks:", weeks)
             })
             .store(in: &cancellables)
     }

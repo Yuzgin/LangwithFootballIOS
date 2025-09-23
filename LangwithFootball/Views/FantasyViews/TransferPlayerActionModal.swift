@@ -12,6 +12,7 @@ struct TransferPlayerActionModal: View {
     let position: String
     let onRemovePlayer: () -> Void
     let onSelectReplacement: () -> Void
+    let onMakeCaptain: (() -> Void)?
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
@@ -114,6 +115,28 @@ struct TransferPlayerActionModal: View {
                                     .fill(Color.blue)
                             )
                         }
+
+                        // Make Captain Button
+                        if let onMakeCaptain {
+                            Button(action: {
+                                onMakeCaptain()
+                                dismiss()
+                            }) {
+                                HStack {
+                                    Image(systemName: "c.circle.fill")
+                                        .font(.title3)
+                                    Text("Make Captain")
+                                        .font(.headline.weight(.semibold))
+                                }
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 16)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .fill(Color.black)
+                                )
+                            }
+                        }
                     }
                 }
                 .padding()
@@ -160,6 +183,7 @@ struct TransferPlayerActionModal: View {
         ),
         position: "Midfielder-1",
         onRemovePlayer: {},
-        onSelectReplacement: {}
+        onSelectReplacement: {},
+        onMakeCaptain: {}
     )
 }

@@ -7,12 +7,14 @@ struct TeamSnapshot: Identifiable, Codable {
     let gameWeek: GameWeek
     let snapshotDate: Date
     let weeklyPoints: Int
+    let captain: Player?
 
     enum CodingKeys: String, CodingKey {
         case team, players
         case gameWeek = "game_week"
         case snapshotDate = "snapshot_date"
         case weeklyPoints = "weekly_points"
+        case captain
     }
 
     init(from decoder: Decoder) throws {
@@ -26,6 +28,7 @@ struct TeamSnapshot: Identifiable, Codable {
         }
         snapshotDate = date
         weeklyPoints = try container.decode(Int.self, forKey: .weeklyPoints)
+        captain = try container.decodeIfPresent(Player.self, forKey: .captain)
         
         // Generate a unique ID from team ID and snapshot date
         id = team.id.hashValue ^ snapshotDate.hashValue

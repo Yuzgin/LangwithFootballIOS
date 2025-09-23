@@ -174,20 +174,64 @@ class AuthService {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
         
         let body: [String: Any] = ["email": email, "password": password]
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)
         
-        URLSession.shared.dataTask(with: request) { _, response, error in
+        // Debug logging (removed unused variables)
+        
+        URLSession.shared.dataTask(with: request) { data, response, error in
             if let error = error {
+                
                 completion(.failure(error))
                 return
             }
             
-            if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
+            guard let httpResponse = response as? HTTPURLResponse else {
+                let err = NSError(domain: "", code: -10, userInfo: [NSLocalizedDescriptionKey: "Invalid response from server"])
+                completion(.failure(err))
+                return
+            }
+            
+            // Debug logging for response (removed unused variables)
+            
+            switch httpResponse.statusCode {
+            case 200...299:
                 completion(.success(true))
-            } else {
-                let err = NSError(domain: "", code: -3, userInfo: [NSLocalizedDescriptionKey: "Registration failed"])
+            case 400:
+                // Bad request - try to parse error message from response
+                var errorMessage = "Invalid registration data"
+                if let data = data,
+                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                    if let detail = json["detail"] as? String {
+                        errorMessage = detail
+                    } else if let message = json["message"] as? String {
+                        errorMessage = message
+                    } else if let errors = json["errors"] as? [String: Any] {
+                        // Handle validation errors
+                        let errorMessages = errors.compactMap { key, value in
+                            if let valueArray = value as? [String] {
+                                return "\(key): \(valueArray.joined(separator: ", "))"
+                            }
+                            return "\(key): \(value)"
+                        }
+                        errorMessage = errorMessages.joined(separator: "; ")
+                    }
+                }
+                let err = NSError(domain: "", code: -3, userInfo: [NSLocalizedDescriptionKey: errorMessage])
+                completion(.failure(err))
+            case 409:
+                let err = NSError(domain: "", code: -3, userInfo: [NSLocalizedDescriptionKey: "An account with this email already exists"])
+                completion(.failure(err))
+            case 422:
+                let err = NSError(domain: "", code: -3, userInfo: [NSLocalizedDescriptionKey: "Invalid email format or password requirements not met"])
+                completion(.failure(err))
+            case 500...599:
+                let err = NSError(domain: "", code: -3, userInfo: [NSLocalizedDescriptionKey: "Server error. Please try again later"])
+                completion(.failure(err))
+            default:
+                let err = NSError(domain: "", code: -3, userInfo: [NSLocalizedDescriptionKey: "Registration failed with status code: \(httpResponse.statusCode)"])
                 completion(.failure(err))
             }
         }.resume()
@@ -212,6 +256,31 @@ class AuthService {
         // For now, we'll let the server handle refresh token validation
         // In a production app, you might want to decode the JWT to check expiration
         return false
+    }
+    
+    /// Send password reset email
+    func sendPasswordReset(email: String, completion: @escaping (Result<Bool, Error>) -> Void) {
+        let url = URL(string: "\(baseURL)/api/password-reset/")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let body: [String: Any] = ["email": email]
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        
+        URLSession.shared.dataTask(with: request) { _, response, error in
+            if let error = error {
+                completion(.failure(error))
+                return
+            }
+            
+            if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
+                completion(.success(true))
+            } else {
+                let err = NSError(domain: "", code: -9, userInfo: [NSLocalizedDescriptionKey: "Failed to send password reset email"])
+                completion(.failure(err))
+            }
+        }.resume()
     }
 }
 

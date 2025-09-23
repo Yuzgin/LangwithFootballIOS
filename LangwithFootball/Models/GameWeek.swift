@@ -26,7 +26,12 @@ struct GameWeek: Identifiable, Codable {
         endDate = end
     }
 
-    private static let dateFormatter: DateFormatter = {
+    var isCurrent: Bool {
+        let now = Date()
+        return startDate <= now && now <= endDate
+    }
+    
+    static let dateFormatter: DateFormatter = {
         let f = DateFormatter()
         f.calendar = Calendar(identifier: .gregorian)
         f.locale = Locale(identifier: "en_GB")

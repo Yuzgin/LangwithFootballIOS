@@ -17,6 +17,25 @@ private let langwithYellow = Color(red: 1.00, green: 0.85, blue: 0.00)
 private let BADGE_SIZE: CGFloat = 22
 private let BAR_WIDTH: CGFloat = 9
 
+// MARK: - Caches / Singletons
+private let sharedDateTimeFormatter: DateFormatter = {
+    let f = DateFormatter()
+    f.locale = .current
+    f.timeZone = .current
+    f.dateFormat = "EEE d MMM, h:mm a"
+    return f
+}()
+
+private let sharedDateOnlyFormatter: DateFormatter = {
+    let f = DateFormatter()
+    f.locale = .current
+    f.timeZone = .current
+    f.dateFormat = "EEE d MMM"
+    return f
+}()
+
+private var badgeImageCache = NSCache<NSString, UIImage>()
+
 // MARK: - Color Extension
 
 extension Color {
@@ -41,12 +60,17 @@ extension Color {
 
 /// Returns just the college/base name (e.g. "Langwith 5s" -> "Langwith")
 func baseTeamName(from fullName: String) -> String {
-    if let first = fullName.split(separator: " ").first {
+    let trimmed = fullName.trimmingCharacters(in: .whitespacesAndNewlines)
+    // Handle multi-word college names first
+    if trimmed.hasPrefix("Anne Lister") { return "Anne Lister" }
+    if trimmed.hasPrefix("David Kato") { return "David Kato" }
+
+    if let first = trimmed.split(separator: " ").first {
         return String(first)
     }
-    return fullName.replacingOccurrences(of: #"[\d\s]*s?$"#,
-                                         with: "",
-                                         options: .regularExpression)
+    return trimmed.replacingOccurrences(of: #"[\d\s]*s?$"#,
+                                        with: "",
+                                        options: .regularExpression)
 }
 
 /// Extract Langwith team number 1...6 if present (e.g. "Langwith 3s" -> 3)
@@ -70,7 +94,10 @@ private let teamBaseColors: [String: Color] = [
     "Goodricke": .green,
     "James": .black,
     "Alcuin": .red,
-    "Vanbrugh": .purple
+    "Vanbrugh": .purple,
+    "Anne Lister": Color(red: 0.85, green: 0.93, blue: 1.0),
+    "David Kato": .orange,
+    "Medics": .white
 ]
 
 /// Helper to build vertical gradients
@@ -100,8 +127,10 @@ private func langwithYellowToLightYellowGradient(for fullName: String) -> Linear
 /// Gradient map for other colleges
 private func teamGradient(for base: String) -> LinearGradient? {
     switch base {
-    case "Lister", "Kato":
-        return verticalGradient([lightBlue, .orange])
+    case "Anne Lister":
+        return verticalGradient([ Color(red: 0.90, green: 0.96, blue: 1.00), Color(red: 0.75, green: 0.88, blue: 1.00) ])
+    case "David Kato":
+        return verticalGradient([ Color.orange.opacity(0.9), Color.orange ])
 
     case "Langwith":
         return verticalGradient([
@@ -131,6 +160,9 @@ private func teamGradient(for base: String) -> LinearGradient? {
     case "Vanbrugh":
         return verticalGradient([ Color(red: 0.75, green: 0.60, blue: 0.95), .purple ])
 
+    case "Medics":
+        return verticalGradient([ Color.white, Color(white: 0.92) ])
+
     default:
         return nil
     }
@@ -142,10 +174,10 @@ private func barGlow(for teamName: String) -> (color: Color, radius: CGFloat, op
           let n = langwithNumber(from: teamName) else {
         return nil
     }
-    // 1s -> strong glow, 6s -> none
+    // 1s -> subtle glow, 6s -> none (reduced intensity for performance)
     let t = max(0.0, 1.0 - Double(n - 1) / 5.0) // 1s=1, 6s=0
-    let radius = CGFloat(30 * t)                // wider halo
-    let opacity = 0.9 * t                      // not "stronger", just further reach
+    let radius = CGFloat(18 * t)
+    let opacity = 0.45 * t
     guard radius > 0.2, opacity > 0.1 else { return nil }
     return (langwithYellow, radius, opacity)
 }
@@ -203,18 +235,27 @@ func gradientBar(for teamName: String) -> some View {
 
 /// Compute the expected asset name for a team badge
 private func teamBadgeAssetName(for fullName: String) -> String {
-    let base = baseTeamName(from: fullName).lowercased()
+    let baseRaw = baseTeamName(from: fullName)
+    let base = baseRaw.lowercased()
     if base == "langwith", let n = langwithNumber(from: fullName) {
         return "badge_langwith_\(n)"
     }
+    // Special cases for multi-word assets
+    if baseRaw == "Anne Lister" { return "badge_annelister" }
+    if baseRaw == "David Kato" { return "badge_davidkato" }
+    if baseRaw == "Medics" { return "badge_medics" }
     return "badge_\(base)" // e.g. badge_halifax, badge_derwent, etc.
 }
 
 /// Return a SwiftUI Image if the asset exists, else nil
 func badgeImage(for fullName: String) -> Image? {
     let asset = teamBadgeAssetName(for: fullName)
-    if UIImage(named: asset) != nil {
-        return Image(asset)
+    if let cached = badgeImageCache.object(forKey: asset as NSString) {
+        return Image(uiImage: cached)
+    }
+    if let ui = UIImage(named: asset) {
+        badgeImageCache.setObject(ui, forKey: asset as NSString)
+        return Image(uiImage: ui)
     }
     // Optional: try a generic 'badge_langwith' if a numbered one isn't present
     if baseTeamName(from: fullName) == "Langwith",
@@ -226,11 +267,7 @@ func badgeImage(for fullName: String) -> Image? {
 
 /// Display-only aliasing for certain team names
 func displayTeamName(_ fullName: String) -> String {
-    // Exact merge-name alias
-    if fullName.hasPrefix("Lister & Kato") {
-        let suffix = fullName.dropFirst("Lister & Kato".count)
-        return "Lister/Kato" + suffix
-    }
+    // Remove legacy aliasing for merged team (now split to Anne Lister / David Kato)
     // Replace base "Constantine" with "Connie", keeping any suffix (e.g., "Connie 1s")
     if fullName.hasPrefix("Constantine") {
         let suffix = fullName.dropFirst("Constantine".count)
@@ -380,22 +417,23 @@ struct FixtureCard: View {
     }
     
     private func formattedDateTime(date: Date, time: Date) -> String {
-        let cal = Calendar.current
-        let dateComps = cal.dateComponents([.year, .month, .day], from: date)
-        let timeComps = cal.dateComponents([.hour, .minute, .second], from: time)
+        // Combine provided date and time assuming both originate from UTC
+        var utcCal = Calendar(identifier: .gregorian)
+        utcCal.timeZone = TimeZone(secondsFromGMT: 0)!
+        let d = utcCal.dateComponents([.year, .month, .day], from: date)
+        let t = utcCal.dateComponents([.hour, .minute, .second], from: time)
         var merged = Date()
-        if let y = dateComps.year, let m = dateComps.month, let d = dateComps.day,
-           let h = timeComps.hour, let min = timeComps.minute, let s = timeComps.second {
+        if let y = d.year, let m = d.month, let day = d.day,
+           let h = t.hour, let min = t.minute, let s = t.second {
             var comps = DateComponents()
-            comps.year = y; comps.month = m; comps.day = d
+            comps.timeZone = TimeZone(secondsFromGMT: 0)
+            comps.year = y; comps.month = m; comps.day = day
             comps.hour = h; comps.minute = min; comps.second = s
-            merged = cal.date(from: comps) ?? date
+            merged = utcCal.date(from: comps) ?? date
         } else {
             merged = date
         }
-        let formatter = DateFormatter()
-        formatter.dateFormat = "d MMMM yyyy, h:mm a"
-        return formatter.string(from: merged)
+        return sharedDateTimeFormatter.string(from: merged)
     }
 }
 
@@ -467,8 +505,6 @@ struct ResultCard: View {
     }
     
     private func formattedDate(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "d MMMM yyyy, h:mm a"
-        return formatter.string(from: date)
+        return sharedDateOnlyFormatter.string(from: date)
     }
 }

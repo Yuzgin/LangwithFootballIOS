@@ -18,7 +18,8 @@ final class CreateTeamViewModel: ObservableObject {
     @Published var isLoading: Bool = true
     @Published var errorMessage: String?
     @Published var hasTeam: Bool = false
-    @Published var isCheckingTeam: Bool = true
+    @Published var isCheckingTeam: Bool = false
+    @Published var captainId: Int? = nil
     
     private var cancellables = Set<AnyCancellable>()
     
@@ -37,7 +38,6 @@ final class CreateTeamViewModel: ObservableObject {
     
     init() {
         fetchPlayers()
-        checkIfUserHasTeam()
     }
     
     func fetchPlayers() {
@@ -57,16 +57,28 @@ final class CreateTeamViewModel: ObservableObject {
     }
     
     func checkIfUserHasTeam() {
-        // Reset checking flag whenever we perform the check
+        // Prevent duplicate calls if already checking
+        guard !isCheckingTeam else {
+            return
+        }
+        
+        // Reset checking flag and clear any previous error
         isCheckingTeam = true
+        errorMessage = nil
 
         APIService.shared.fetchTeam()
             .receive(on: DispatchQueue.main)
             .sink(receiveCompletion: { [weak self] completion in
                 guard let self = self else { return }
-                if case .failure(_) = completion {
-                    // On any failure assume user doesn't have a team
-                    self.hasTeam = false
+                if case .failure(let error) = completion {
+                    // Check if this is a 404 (no team exists) vs other errors
+                    if let urlError = error as? URLError, urlError.code == .badServerResponse {
+                        // This is likely a 404 - user doesn't have a team
+                        self.hasTeam = false
+                    } else {
+                        // This is a real error - show error message
+                        self.errorMessage = "Failed to check team status: \(error.localizedDescription)"
+                    }
                     self.isCheckingTeam = false
                 }
             }, receiveValue: { [weak self] team in
@@ -100,6 +112,9 @@ final class CreateTeamViewModel: ObservableObject {
         
         selectedPlayers.removeValue(forKey: position)
         budget += price
+        if captainId == playerId {
+            captainId = nil
+        }
     }
     
     func isPlayerSelected(playerId: Int) -> Bool {
@@ -141,16 +156,29 @@ final class CreateTeamViewModel: ObservableObject {
         (getPositionCount(type: "Defender") == 5 && getPositionCount(type: "Midfielder") == 4)
     }
     
+    var needsCaptainSelection: Bool {
+        return getSelectedPlayerCount() == 10 && selectedPlayers["Goalkeeper"] != nil && !teamName.isEmpty && captainId == nil
+    }
+
+    // MARK: - Captain
+    func setCaptain(playerId: Int) {
+        if selectedPlayers.values.contains(playerId) {
+            captainId = playerId
+        }
+    }
+
     func canCreateTeam() -> Bool {
-        return getSelectedPlayerCount() == 10 && selectedPlayers["Goalkeeper"] != nil && !teamName.isEmpty
+        return getSelectedPlayerCount() == 10 && selectedPlayers["Goalkeeper"] != nil && !teamName.isEmpty && captainId != nil
     }
     
     func createTeam() {
         guard canCreateTeam() else { return }
         
+        // Server still errors when captain is sent on create; create first without captain, then update.
         let teamData = CreateTeamRequest(
             name: teamName,
-            players: Array(selectedPlayers.values)
+            players: Array(selectedPlayers.values),
+            captain: nil
         )
         
         APIService.shared.createTeam(teamData: teamData)
@@ -162,11 +190,28 @@ final class CreateTeamViewModel: ObservableObject {
                 }
             }, receiveValue: { [weak self] team in
                 guard let self = self else { return }
-                self.hasTeam = true
-                // Clear the form
-                self.selectedPlayers.removeAll()
-                self.teamName = ""
-                self.budget = 100.0
+                let update = UpdateTeamRequest(
+                    players: Array(self.selectedPlayers.values),
+                    formation: self.selectedFormation,
+                    captain: self.captainId
+                )
+                APIService.shared.updateTeam(teamData: update)
+                    .receive(on: DispatchQueue.main)
+                    .sink(receiveCompletion: { [weak self] updateCompletion in
+                        guard let self = self else { return }
+                        if case .failure(let error) = updateCompletion {
+                            self.errorMessage = "Team created but failed to set captain: \(error.localizedDescription)"
+                        }
+                    }, receiveValue: { [weak self] _ in
+                        guard let self = self else { return }
+                        self.hasTeam = true
+                        // Clear the form
+                        self.selectedPlayers.removeAll()
+                        self.teamName = ""
+                        self.budget = 100.0
+                        self.captainId = nil
+                    })
+                    .store(in: &self.cancellables)
             })
             .store(in: &cancellables)
     }
@@ -184,4 +229,5 @@ final class CreateTeamViewModel: ObservableObject {
 struct CreateTeamRequest: Codable {
     let name: String
     let players: [Int]
+    let captain: Int?
 }

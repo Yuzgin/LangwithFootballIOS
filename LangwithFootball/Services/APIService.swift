@@ -33,8 +33,6 @@ class APIService {
 
         if let token = AuthService.shared.authToken {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        } else {
-            print("⚠️ No auth token found for path: \(path)")
         }
 
         return request
@@ -49,6 +47,7 @@ class APIService {
                 guard let httpResponse = response as? HTTPURLResponse else {
                     throw URLError(.badServerResponse)
                 }
+                // Logging disabled for authorized requests (except GameWeeks handled elsewhere)
                 if httpResponse.statusCode == 401 {
                     throw APIError.unauthorized
                 }
@@ -69,7 +68,6 @@ class APIService {
                         }
                         .catch { refreshError -> AnyPublisher<Data, Error> in
                             // If refresh fails, logout user and return error
-                            print("❌ Token refresh failed: \(refreshError)")
                             AuthService.shared.logout()
                             return Fail(error: refreshError).eraseToAnyPublisher()
                         }
@@ -88,26 +86,13 @@ class APIService {
             .eraseToAnyPublisher()
     }
     
-    /// Fetch the current user's team
+    /// Fetch the current user's team (with automatic token refresh on 401)
     func fetchTeam() -> AnyPublisher<Team, Error> {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
 
         return performAuthorizedRequest(path: "/api/team/")
-            // Peek at the raw response body
-            .handleEvents(receiveOutput: { data in
-                if let body = String(data: data, encoding: .utf8) {
-                    print("📦 Response body:\n\(body)")
-                } else {
-                    print("📦 Response body (non-UTF8, \(data.count) bytes)")
-                }
-            })
             .decode(type: Team.self, decoder: decoder)
-            .mapError { error in
-                // Helpful debug for decoding or transport errors
-                print("❌ fetchTeam error:", error)
-                return error
-            }
             .eraseToAnyPublisher()
     }
     
@@ -128,15 +113,7 @@ class APIService {
 
         return URLSession.shared.dataTaskPublisher(for: request)
             .tryMap { result in
-                // 📡 Debug: print HTTP status code
-                if let httpResponse = result.response as? HTTPURLResponse {
-                    print("📡 Status code:", httpResponse.statusCode)
-                }
-
-                // 📦 Debug: print raw response body
-                if let body = String(data: result.data, encoding: .utf8) {
-                    print("📦 Response body:\n\(body)")
-                }
+                // Logging disabled for public matches endpoint
 
                 // ❌ Throw error if not 2xx status
                 guard let response = result.response as? HTTPURLResponse,
@@ -159,15 +136,7 @@ class APIService {
 
         return URLSession.shared.dataTaskPublisher(for: request)
             .tryMap { fixture in
-                // 📡 Debug: print HTTP status code
-                if let httpResponse = fixture.response as? HTTPURLResponse {
-                    print("📡 Status code:", httpResponse.statusCode)
-                }
-
-                // 📦 Debug: print raw response body
-                if let body = String(data: fixture.data, encoding: .utf8) {
-                    print("📦 Response body:\n\(body)")
-                }
+                // Logging disabled for public fixtures endpoint
 
                 // ❌ Throw error if not 2xx status
                 guard let response = fixture.response as? HTTPURLResponse,
@@ -181,21 +150,12 @@ class APIService {
             .eraseToAnyPublisher()
     }
 
-    /// Fetch all GameWeeks
+    /// Fetch all GameWeeks (authorized; endpoint requires auth)
     func fetchGameWeeks() -> AnyPublisher<[GameWeek], Error> {
-        let request = makePublicRequest(path: "/api/gameweeks/")
-
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
 
-        return URLSession.shared.dataTaskPublisher(for: request)
-            .tryMap { result in
-                guard let response = result.response as? HTTPURLResponse,
-                      200..<300 ~= response.statusCode else {
-                    throw URLError(.badServerResponse)
-                }
-                return result.data
-            }
+        return performAuthorizedRequest(path: "/api/game-weeks/")
             .decode(type: [GameWeek].self, decoder: decoder)
             .eraseToAnyPublisher()
     }
@@ -226,6 +186,25 @@ class APIService {
             .eraseToAnyPublisher()
     }
 
+    /// Fetch leaderboard: all teams ordered by total points
+    func fetchTeams() -> AnyPublisher<[Team], Error> {
+        // Backend TeamListView is open (AllowAny), so use public request
+        let request = makePublicRequest(path: "/api/teams/")
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+
+        return URLSession.shared.dataTaskPublisher(for: request)
+            .tryMap { data, response -> Data in
+                guard let httpResponse = response as? HTTPURLResponse,
+                      200..<300 ~= httpResponse.statusCode else {
+                    throw URLError(.badServerResponse)
+                }
+                return data
+            }
+            .decode(type: [Team].self, decoder: decoder)
+            .eraseToAnyPublisher()
+    }
+
     /// Fetch all Women's Fixtures
     func fetchWomensFixtures() -> AnyPublisher<[WomensFixture], Error> {
         let request = makePublicRequest(path: "/api/womensfixtures/")
@@ -242,6 +221,35 @@ class APIService {
                 return result.data
             }
             .decode(type: [WomensFixture].self, decoder: decoder)
+            .eraseToAnyPublisher()
+    }
+    
+    /// Send password reset email
+    func sendPasswordReset(email: String) -> AnyPublisher<Void, Error> {
+        var request = makePublicRequest(path: "/api/password-reset/", method: "POST")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let body = ["email": email]
+        
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        } catch {
+            return Fail(error: error).eraseToAnyPublisher()
+        }
+        
+        return URLSession.shared.dataTaskPublisher(for: request)
+            .tryMap { data, response -> Void in
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    throw URLError(.badServerResponse)
+                }
+                
+                guard 200..<300 ~= httpResponse.statusCode else {
+                    throw URLError(.badServerResponse)
+                }
+                
+                return ()
+            }
+            .mapError { $0 as Error }
             .eraseToAnyPublisher()
     }
     
@@ -283,6 +291,7 @@ class APIService {
                 guard let httpResponse = response as? HTTPURLResponse else {
                     throw URLError(.badServerResponse)
                 }
+                // Logging disabled for authorized requests with body
                 if httpResponse.statusCode == 401 {
                     throw APIError.unauthorized
                 }
@@ -303,7 +312,6 @@ class APIService {
                         }
                         .catch { refreshError -> AnyPublisher<Data, Error> in
                             // If refresh fails, logout user and return error
-                            print("❌ Token refresh failed: \(refreshError)")
                             AuthService.shared.logout()
                             return Fail(error: refreshError).eraseToAnyPublisher()
                         }

@@ -20,28 +20,11 @@ struct TopTeamSheetView: View {
     }
     
     private func getWeeklyPointsForSnapshot(_ snapshot: TeamSnapshot) -> [Int: Int] {
-        let gameWeekId = snapshot.gameWeek.id
-        
-        // Filter game stats to only include those for the selected gameweek
-        let filteredStats = playerGameStats.filter { stat in
-            stat.match.gameWeek == gameWeekId
-        }
-        
-        // Group stats by player ID and sum up points for each player
+        // Match FantasyView logic: use pre-calculated points from snapshot players
         var weeklyPoints: [Int: Int] = [:]
-        
-        for stat in filteredStats {
-            let playerId = stat.player.id
-            weeklyPoints[playerId, default: 0] += stat.points
-        }
-        
-        // For players in the snapshot who don't have game stats for this week, set points to 0
         for player in snapshot.players {
-            if weeklyPoints[player.id] == nil {
-                weeklyPoints[player.id] = 0
-            }
+            weeklyPoints[player.id] = player.points
         }
-        
         return weeklyPoints
     }
     
@@ -59,7 +42,8 @@ struct TopTeamSheetView: View {
                 // Formation View
                 FormationView(
                     players: topSnapshot.players,
-                    playerWeeklyPoints: getWeeklyPointsForSnapshot(topSnapshot)
+                    playerWeeklyPoints: getWeeklyPointsForSnapshot(topSnapshot),
+                    captain: topSnapshot.captain
                 )
                 .transition(.opacity)
             } else {

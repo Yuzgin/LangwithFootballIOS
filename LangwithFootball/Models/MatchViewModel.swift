@@ -43,7 +43,6 @@ final class MatchViewModel: ObservableObject {
                 
                 if case .failure(let error) = completion {
                     self.errorMessage = "Failed to load matches: \(error.localizedDescription)"
-                    print("❌ Decoding or network error:", error)
                 }
             }, receiveValue: { [weak self] matches in
                 guard let self = self else { return }
@@ -51,7 +50,6 @@ final class MatchViewModel: ObservableObject {
                 self.matches = matches
                 self.isLoading = false
                 self.hasLoaded = true
-                print("✅ Loaded matches:", matches)
             })
             .store(in: &cancellables)
     }

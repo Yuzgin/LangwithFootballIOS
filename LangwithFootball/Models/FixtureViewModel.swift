@@ -43,7 +43,6 @@ final class FixtureViewModel: ObservableObject {
                 
                 if case .failure(let error) = completion {
                     self.errorMessage = "Failed to load fixtures: \(error.localizedDescription)"
-                    print("❌ Decoding or network error:", error)
                 }
             }, receiveValue: { [weak self] fixtures in
                 guard let self = self else { return }
@@ -51,7 +50,6 @@ final class FixtureViewModel: ObservableObject {
                 self.fixtures = fixtures
                 self.isLoading = false
                 self.hasLoaded = true
-                print("✅ Loaded Fixtures:", fixtures)
             })
             .store(in: &cancellables)
     }
